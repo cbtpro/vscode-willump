@@ -16,6 +16,18 @@
       {
         "command": "willump.helloWorld",
         "title": "Hello World"
+      },
+      {
+        "command": "willump.checkPort",
+        "title": "检查端口占用情况"
+      },
+      {
+        "command": "willump.killPort",
+        "title": "杀掉占用端口的进程"
+      },
+      {
+        "command": "willump.listPorts",
+        "title": "查看所有端口占用情况"
       }
     ]
   },
