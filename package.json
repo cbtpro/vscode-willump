@@ -3,6 +3,7 @@
   "displayName": "willump",
   "description": "威朗普",
   "version": "0.0.1",
+  "publisher": "cbtpro",
   "icon": "assets/icon.png",
   "engines": {
     "vscode": "^1.100.0"
@@ -44,10 +45,12 @@
     "url": "https://github.com/cbtpro"
   },
   "scripts": {
-    "vscode:prepublish": "pnpm run compile",
+    "preinstall": "npm install -g vsce",
+    "vscode:prepublish": "npm run compile",
+    "package": "vsce package",
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
-    "pretest": "pnpm run compile && pnpm run lint",
+    "pretest": "npm run compile && npm run lint",
     "lint": "eslint src",
     "test": "vscode-test"
   },
