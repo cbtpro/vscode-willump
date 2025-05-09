@@ -1,71 +1,29 @@
-# willump README
+# Willump - VS Code 插件
 
-This is the README for your extension "willump". After writing up a brief description, we recommend including the following sections.
+Willump 是一款强大但不张扬的 VS Code 插件，专注于开发者的本地端口管理。
 
-## Features
+## ✨ 功能亮点
 
-Describe specific features of your extension including screenshots of your extension in action. Image paths are relative to this README file.
+- ✅ 查看指定端口是否被占用
+- 🛠️ 杀掉指定端口的进程
+- 📊 查看当前系统所有被占用的端口信息
 
-For example if there is an image subfolder under your extension project workspace:
+## 📦 命令列表
 
-\!\[feature X\]\(images/feature-x.png\)
+| 命令                            | 描述                         |
+| ------------------------------- | ---------------------------- |
+| `Willump: 检查端口占用情况`     | 输入端口号，查看是否被占用   |
+| `Willump: 杀掉占用端口的进程`   | 输入端口号，终止该端口的进程 |
+| `Willump: 查看所有端口占用情况` | 一键查看当前被占用的所有端口 |
 
-> Tip: Many popular extensions utilize animations. This is an excellent way to show off your extension! We recommend short, focused animations that are easy to follow.
+## 🧙‍♂️ 关于名字
 
-## Requirements
+Willump 来自《英雄联盟》的雪人伙伴，是个沉默可靠的力量象征——正如这个插件一样，不多话但很能干。
 
-If you have any requirements or dependencies, add a section describing those and how to install and configure them.
+## 🧑‍💻 作者
 
-## Extension Settings
+[@cbtpro](https://github.com/cbtpro)
 
-Include if your extension adds any VS Code settings through the `contributes.configuration` extension point.
+## 🐛 反馈 & 建议
 
-For example:
-
-This extension contributes the following settings:
-
-* `myExtension.enable`: Enable/disable this extension.
-* `myExtension.thing`: Set to `blah` to do something.
-
-## Known Issues
-
-Calling out known issues can help limit users opening duplicate issues against your extension.
-
-## Release Notes
-
-Users appreciate release notes as you update your extension.
-
-### 1.0.0
-
-Initial release of ...
-
-### 1.0.1
-
-Fixed issue #.
-
-### 1.1.0
-
-Added features X, Y, and Z.
-
----
-
-## Following extension guidelines
-
-Ensure that you've read through the extensions guidelines and follow the best practices for creating your extension.
-
-* [Extension Guidelines](https://code.visualstudio.com/api/references/extension-guidelines)
-
-## Working with Markdown
-
-You can author your README using Visual Studio Code. Here are some useful editor keyboard shortcuts:
-
-* Split the editor (`Cmd+\` on macOS or `Ctrl+\` on Windows and Linux).
-* Toggle preview (`Shift+Cmd+V` on macOS or `Shift+Ctrl+V` on Windows and Linux).
-* Press `Ctrl+Space` (Windows, Linux, macOS) to see a list of Markdown snippets.
-
-## For more information
-
-* [Visual Studio Code's Markdown Support](http://code.visualstudio.com/docs/languages/markdown)
-* [Markdown Syntax Reference](https://help.github.com/articles/markdown-basics/)
-
-**Enjoy!**
+欢迎在 [GitHub Issues](https://github.com/cbtpro/vscode-willump/issues) 中提交问题或建议。

@@ -3,6 +3,7 @@
   "displayName": "willump",
   "description": "威朗普",
   "version": "0.0.1",
+  "icon": "assets/icon.png",
   "engines": {
     "vscode": "^1.100.0"
   },
