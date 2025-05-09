@@ -1,7 +1,13 @@
 // The module 'vscode' contains the VS Code extensibility API
 // Import the module and reference it with the alias vscode in your code below
 import * as vscode from 'vscode';
-import { checkPortUsage, killProcessOnPort, listAllPorts } from './utils/common.port';
+import {
+	checkPortUsage,
+	killProcessOnPort,
+	listAllPorts,
+	getWebviewContent,
+	getPortListData
+} from './utils/common.port';
 
 // This method is called when your extension is activated
 // Your extension is activated the very first time the command is executed
@@ -10,16 +16,6 @@ export function activate(context: vscode.ExtensionContext) {
 	// This line of code will only be executed once when your extension is activated
 	console.log('Congratulations, your extension "willump" is now active!');
 
-	// The command has been defined in the package.json file
-	// Now provide the implementation of the command with registerCommand
-	// The commandId parameter must match the command field in package.json
-	const disposable = vscode.commands.registerCommand('willump.helloWorld', () => {
-		// The code you place here will be executed every time your command is executed
-		// Display a message box to the user
-		vscode.window.showInformationMessage('Hello VS Code!');
-	});
-	context.subscriptions.push(disposable);
-
 	// 新的 checkPort 命令
 	const checkPortCommand = vscode.commands.registerCommand('willump.checkPort', async () => {
 		const input = await vscode.window.showInputBox({
@@ -27,7 +23,9 @@ export function activate(context: vscode.ExtensionContext) {
 			placeHolder: '3000 8080'
 		});
 
-		if (!input) return;
+		if (!input) {
+			return;
+		}
 
 		const ports = input
 			.split(/\s+/)
@@ -46,7 +44,9 @@ export function activate(context: vscode.ExtensionContext) {
 				prompt: '输入要杀掉进程的端口（用空格分隔）',
 				placeHolder: '3000 8080'
 			});
-			if (!input) return;
+			if (!input) {
+				return;
+			}
 
 			const ports = input.split(/\s+/).filter(Boolean);
 			for (const port of ports) {
@@ -57,6 +57,18 @@ export function activate(context: vscode.ExtensionContext) {
 	context.subscriptions.push(
 		vscode.commands.registerCommand('willump.listPorts', async () => {
 			listAllPorts();
+		})
+	);
+	context.subscriptions.push(
+		vscode.commands.registerCommand('willump.viewPorts', async () => {
+			const panel = vscode.window.createWebviewPanel('willumpPortsView', '当前端口占用情况', vscode.ViewColumn.One, {
+				enableScripts: true
+			});
+
+			// 获取端口信息
+			const portsInfo = await getPortListData(); // 假设这个方法返回 JSON 数据
+			const html = getWebviewContent(portsInfo);
+			panel.webview.html = html;
 		})
 	);
 }

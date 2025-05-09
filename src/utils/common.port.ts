@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import * as childProcess from 'child_process';
+import { promisify } from 'util';
 
 /**
  * 检查指定端口的使用情况。
@@ -134,4 +135,90 @@ export function listAllPorts() {
 		// 显示输出通道
 		outputChannel.show();
 	});
+}
+
+const execAsync = promisify(childProcess.exec);
+
+export async function getPortListData(): Promise<Array<{ port: string; pid: string; command: string }>> {
+	const platform = process.platform;
+	let cmd = platform === 'win32' ? 'netstat -ano' : 'lsof -i -P -n';
+
+	try {
+		const { stdout } = await execAsync(cmd, { maxBuffer: 1024 * 1024 });
+		const result: Array<{ port: string; pid: string; command: string }> = [];
+
+		if (platform === 'win32') {
+			const lines = stdout.split('\n').slice(4);
+			for (const line of lines) {
+				const parts = line.trim().split(/\s+/);
+				if (parts.length >= 5 && parts[1] === 'TCP') {
+					const localAddress = parts[2];
+					const pid = parts[4];
+					const port = localAddress.split(':').pop() || '';
+					result.push({ port, pid, command: 'Unknown' });
+				}
+			}
+		} else {
+			const lines = stdout.split('\n').slice(1);
+			for (const line of lines) {
+				const parts = line.trim().split(/\s+/);
+				if (parts.length > 8) {
+					result.push({
+						command: parts[0],
+						pid: parts[1],
+						port: parts[8].split(':').pop() || ''
+					});
+				}
+			}
+		}
+
+		return result;
+	} catch (err) {
+		vscode.window.showErrorMessage('❌ 获取端口数据失败');
+		return [];
+	}
+}
+export function getWebviewContent(data: Array<{ port: string; pid: string; command: string }>): string {
+	const rows = data
+		.map(
+			item => `
+		<tr>
+			<td>${item.port}</td>
+			<td>${item.pid}</td>
+			<td>${item.command}</td>
+		</tr>
+	`
+		)
+		.join('');
+
+	return `
+		<!DOCTYPE html>
+		<html lang="zh">
+		<head>
+			<meta charset="UTF-8">
+			<title>端口占用情况</title>
+			<style>
+				body { font-family: sans-serif; padding: 16px; }
+				table { width: 100%; border-collapse: collapse; margin-top: 1em; }
+				th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+				th { background-color: #f4f4f4; }
+			</style>
+		</head>
+		<body>
+			<h2>📡 当前系统端口占用情况</h2>
+			<table>
+				<thead>
+					<tr>
+						<th>端口</th>
+						<th>PID</th>
+						<th>程序</th>
+					</tr>
+				</thead>
+				<tbody>
+					${rows || '<tr><td colspan="3">暂无数据</td></tr>'}
+				</tbody>
+			</table>
+		</body>
+		</html>
+	`;
 }
