@@ -10,6 +10,8 @@ import {
 } from './utils/common.port';
 import { Commands } from './constants';
 
+const FEATURES_VIEW_TYPE = 'willump.featuresView';
+
 // This method is called when your extension is activated
 // Your extension is activated the very first time the command is executed
 export function activate(context: vscode.ExtensionContext) {
@@ -78,6 +80,7 @@ export function activate(context: vscode.ExtensionContext) {
 			panel.webview.onDidReceiveMessage(message => handlePortsWebviewMessage(panel, message), undefined, context.subscriptions);
 		})
 	);
+	context.subscriptions.push(vscode.window.registerTreeDataProvider(FEATURES_VIEW_TYPE, new FeaturesViewProvider()));
 }
 
 // This method is called when your extension is deactivated
@@ -123,28 +126,57 @@ function getNonce() {
 	return text;
 }
 
-async function handlePortsWebviewMessage(panel: vscode.WebviewPanel, message: { type?: string; port?: string; pid?: string }) {
+class FeatureItem extends vscode.TreeItem {
+	constructor(label: string, description: string, command: vscode.Command, iconId: string) {
+		super(label, vscode.TreeItemCollapsibleState.None);
+		this.description = description;
+		this.command = command;
+		this.iconPath = new vscode.ThemeIcon(iconId);
+	}
+}
+
+class FeaturesViewProvider implements vscode.TreeDataProvider<FeatureItem> {
+	getTreeItem(element: FeatureItem): vscode.TreeItem {
+		return element;
+	}
+
+	getChildren(): FeatureItem[] {
+		return [
+			new FeatureItem(
+				'端口占用',
+				'查看 / 搜索 / 终止',
+				{
+					command: Commands.VIEW_PORTS,
+					title: '打开端口占用视图'
+				},
+				'plug'
+			)
+		];
+	}
+}
+
+async function handlePortsWebviewMessage(target: { webview: vscode.Webview }, message: { type?: string; port?: string; pid?: string }) {
 	if (message?.type === 'refreshPorts') {
 		const ports = await getPortListData();
-		panel.webview.postMessage({ type: 'portsUpdated', ports });
+		target.webview.postMessage({ type: 'portsUpdated', ports });
 		return;
 	}
 
 	if (message?.type === 'killPort') {
 		if (!message.port || !message.pid) {
-			panel.webview.postMessage({ type: 'error', message: '缺少端口或进程信息，无法终止进程' });
+			target.webview.postMessage({ type: 'error', message: '缺少端口或进程信息，无法终止进程' });
 			return;
 		}
 
 		try {
 			await killProcessByPid(message.port, message.pid);
-			panel.webview.postMessage({ type: 'killResult', success: true, port: message.port, pid: message.pid });
+			target.webview.postMessage({ type: 'killResult', success: true, port: message.port, pid: message.pid });
 			const ports = await getPortListData();
-			panel.webview.postMessage({ type: 'portsUpdated', ports });
+			target.webview.postMessage({ type: 'portsUpdated', ports });
 		} catch (err) {
 			const errorMessage = err instanceof Error ? err.message : '终止进程失败';
 			vscode.window.showErrorMessage(`❌ ${errorMessage}`);
-			panel.webview.postMessage({ type: 'killResult', success: false, message: errorMessage });
+			target.webview.postMessage({ type: 'killResult', success: false, message: errorMessage });
 		}
 	}
 }

@@ -11,9 +11,28 @@
   "categories": [
     "Other"
   ],
-  "activationEvents": [],
+  "activationEvents": [
+    "onView:willump.featuresView"
+  ],
   "main": "./out/extension.js",
   "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "willump",
+          "title": "Willump",
+          "icon": "assets/activity-bar.svg"
+        }
+      ]
+    },
+    "views": {
+      "willump": [
+        {
+          "id": "willump.featuresView",
+          "name": "功能入口"
+        }
+      ]
+    },
     "commands": [
       {
         "command": "willump.checkPort",

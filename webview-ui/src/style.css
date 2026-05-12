@@ -285,3 +285,39 @@ tr:last-child td {
 		width: 100%;
 	}
 }
+
+@media (max-width: 420px) {
+	.page {
+		padding: 12px;
+	}
+
+	.toolbar {
+		display: grid;
+	}
+
+	h1 {
+		font-size: 18px;
+	}
+
+	p {
+		font-size: 12px;
+	}
+
+	th,
+	td {
+		padding: 8px;
+	}
+
+	.action-column {
+		width: 72px;
+	}
+
+	.danger-button,
+	.secondary-button {
+		padding: 4px 8px;
+	}
+
+	.process-detail div {
+		grid-template-columns: 48px minmax(0, 1fr);
+	}
+}
