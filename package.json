@@ -2,7 +2,7 @@
   "name": "willump",
   "displayName": "willump",
   "description": "威朗普",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "publisher": "cbtpro",
   "icon": "assets/icon.png",
   "engines": {
@@ -21,7 +21,7 @@
       },
       {
         "command": "willump.killPort",
-        "title": "Willump: 杀掉占用端口的进程"
+        "title": "Willump: 终止占用端口的进程"
       },
       {
         "command": "willump.listPorts",
@@ -48,21 +48,29 @@
     "preinstall": "npm install -g vsce",
     "vscode:prepublish": "npm run compile",
     "package": "vsce package",
-    "compile": "tsc -p ./",
+    "compile": "npm run compile:webview && tsc -p ./",
+    "compile:extension": "tsc -p ./",
+    "compile:webview": "vite build --config vite.webview.config.ts",
     "watch": "tsc -watch -p ./",
+    "watch:webview": "vite build --watch --config vite.webview.config.ts",
     "pretest": "npm run compile && npm run lint",
     "lint": "eslint src",
     "test": "vscode-test"
   },
   "devDependencies": {
-    "@types/vscode": "^1.100.0",
     "@types/mocha": "^10.0.10",
     "@types/node": "20.x",
+    "@types/vscode": "^1.100.0",
     "@typescript-eslint/eslint-plugin": "^8.31.1",
     "@typescript-eslint/parser": "^8.31.1",
+    "@vitejs/plugin-vue": "^6.0.6",
+    "@vscode/test-cli": "^0.0.10",
+    "@vscode/test-electron": "^2.5.2",
     "eslint": "^9.25.1",
     "typescript": "^5.8.3",
-    "@vscode/test-cli": "^0.0.10",
-    "@vscode/test-electron": "^2.5.2"
+    "vite": "^8.0.12"
+  },
+  "dependencies": {
+    "vue": "^3.5.34"
   }
 }
