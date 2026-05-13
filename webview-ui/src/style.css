@@ -18,6 +18,31 @@ input {
 	font: inherit;
 }
 
+.route-tabs {
+	display: flex;
+	gap: 6px;
+	padding: 10px 20px 0;
+	border-bottom: 1px solid var(--vscode-panel-border);
+}
+
+.route-tab {
+	border: 0;
+	border-bottom: 2px solid transparent;
+	padding: 7px 10px;
+	color: var(--vscode-descriptionForeground);
+	background: transparent;
+	cursor: pointer;
+}
+
+.route-tab:hover,
+.route-tab.active {
+	color: var(--vscode-foreground);
+}
+
+.route-tab.active {
+	border-bottom-color: var(--vscode-focusBorder);
+}
+
 .page {
 	display: grid;
 	gap: 16px;
@@ -111,6 +136,33 @@ p {
 .search input:focus {
 	outline: 1px solid var(--vscode-focusBorder);
 	outline-offset: -1px;
+}
+
+.field {
+	display: grid;
+	gap: 6px;
+	color: var(--vscode-descriptionForeground);
+}
+
+.field input {
+	min-width: 0;
+	width: 100%;
+	border: 1px solid var(--vscode-input-border, transparent);
+	border-radius: 4px;
+	padding: 7px 9px;
+	color: var(--vscode-input-foreground);
+	background: var(--vscode-input-background);
+}
+
+.field input:focus {
+	outline: 1px solid var(--vscode-focusBorder);
+	outline-offset: -1px;
+}
+
+.muted-line {
+	margin: 0;
+	color: var(--vscode-descriptionForeground);
+	word-break: break-all;
 }
 
 .success-message,
@@ -270,6 +322,31 @@ tr:last-child td {
 	gap: 8px;
 }
 
+.config-grid {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 16px;
+}
+
+.config-panel {
+	display: grid;
+	align-content: start;
+	gap: 14px;
+	border: 1px solid var(--vscode-panel-border);
+	border-radius: 6px;
+	padding: 16px;
+	background: var(--vscode-sideBar-background);
+}
+
+.config-panel h2 {
+	margin: 0;
+	font-size: 16px;
+}
+
+.config-panel p {
+	margin-top: 6px;
+}
+
 @media (max-width: 640px) {
 	.toolbar,
 	.summary {
@@ -284,9 +361,18 @@ tr:last-child td {
 		min-width: 0;
 		width: 100%;
 	}
+
+	.config-grid {
+		grid-template-columns: 1fr;
+	}
 }
 
 @media (max-width: 420px) {
+	.route-tabs {
+		padding-inline: 12px;
+		overflow: auto;
+	}
+
 	.page {
 		padding: 12px;
 	}

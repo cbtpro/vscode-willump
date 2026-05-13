@@ -16,6 +16,10 @@ export enum Commands {
 	 */
 	VIEW_PORTS = 'willump.viewPorts',
 	/**
+	 * 查看 Git 开发配置。
+	 */
+	VIEW_GIT_CONFIG = 'willump.viewGitConfig',
+	/**
 	 * 打开端口占用情况。
 	 */
 	OPEN_PORT = 'willump.openPort',

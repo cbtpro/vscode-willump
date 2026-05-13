@@ -4,8 +4,23 @@ export interface PortInfo {
 	command: string;
 }
 
+export interface GitConfigScope {
+	name: string;
+	email: string;
+	configPath: string;
+	available: boolean;
+	error?: string;
+}
+
+export interface GitConfigInfo {
+	local: GitConfigScope;
+	global: GitConfigScope;
+	workspacePath: string;
+}
+
 export interface WillumpInitialState {
-	ports: PortInfo[];
+	route?: string;
+	ports?: PortInfo[];
 }
 
 export interface VsCodeApi {

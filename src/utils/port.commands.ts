@@ -79,7 +79,12 @@ const posixProfile: PortCommandProfile = {
 	checkPortUsage: port => ({
 		type: 'file',
 		file: 'lsof',
-		args: [`-iTCP:${port}`, '-sTCP:LISTEN', '-P', '-n']
+		args: [
+			`-iTCP:${port}`,
+			'-sTCP:LISTEN',
+			'-P',
+			'-n'
+		]
 	}),
 	findListeningPids: port => ({
 		type: 'file',

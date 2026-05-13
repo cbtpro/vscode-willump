@@ -49,6 +49,10 @@
       {
         "command": "willump.viewPorts",
         "title": "Willump: 查看端口占用"
+      },
+      {
+        "command": "willump.viewGitConfig",
+        "title": "Willump: 查看 Git 开发配置"
       }
     ]
   },
