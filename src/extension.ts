@@ -69,8 +69,8 @@ export function activate(context: vscode.ExtensionContext) {
 	);
 	context.subscriptions.push(
 		vscode.commands.registerCommand(Commands.VIEW_PORTS, async () => {
-			const portsInfo = await getPortListData();
-			openWillumpWebview(context, '当前端口占用情况', ROUTES.PORTS, { ports: portsInfo });
+			const portsInfo = await getPortListData('listening');
+			openWillumpWebview(context, '当前端口占用情况', ROUTES.PORTS, { ports: portsInfo, portScanMode: 'listening' });
 		})
 	);
 	context.subscriptions.push(
@@ -185,11 +185,12 @@ class FeaturesViewProvider implements vscode.TreeDataProvider<FeatureItem> {
 
 async function handleWebviewMessage(
 	target: { webview: vscode.Webview },
-	message: { type?: string; port?: string; pid?: string; scope?: 'local' | 'global'; name?: string; email?: string }
+	message: { type?: string; port?: string; pid?: string; mode?: 'listening' | 'all'; scope?: 'local' | 'global'; name?: string; email?: string }
 ) {
 	if (message?.type === 'refreshPorts') {
-		const ports = await getPortListData();
-		target.webview.postMessage({ type: 'portsUpdated', ports });
+		const mode = message.mode === 'all' ? 'all' : 'listening';
+		const ports = await getPortListData(mode);
+		target.webview.postMessage({ type: 'portsUpdated', ports, mode });
 		return;
 	}
 
@@ -202,8 +203,9 @@ async function handleWebviewMessage(
 		try {
 			await killProcessByPid(message.port, message.pid);
 			target.webview.postMessage({ type: 'killResult', success: true, port: message.port, pid: message.pid });
-			const ports = await getPortListData();
-			target.webview.postMessage({ type: 'portsUpdated', ports });
+			const mode = message.mode === 'all' ? 'all' : 'listening';
+			const ports = await getPortListData(mode);
+			target.webview.postMessage({ type: 'portsUpdated', ports, mode });
 		} catch (err) {
 			const errorMessage = err instanceof Error ? err.message : '终止进程失败';
 			vscode.window.showErrorMessage(errorMessage);

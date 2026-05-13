@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue';
-import { getVsCodeApi, type PortInfo } from '../vscode';
+import { getVsCodeApi, type PortInfo, type PortScanMode } from '../vscode';
 
 interface WebviewMessage {
 	type: 'portsUpdated' | 'killResult' | 'error';
 	ports?: PortInfo[];
+	mode?: PortScanMode;
 	success?: boolean;
 	port?: string;
 	pid?: string;
@@ -13,7 +14,9 @@ interface WebviewMessage {
 
 const vscode = getVsCodeApi();
 const initialPorts = window.__WILLUMP_INITIAL_STATE__?.ports ?? [];
+const initialMode = window.__WILLUMP_INITIAL_STATE__?.portScanMode ?? 'listening';
 const ports = ref<PortInfo[]>(initialPorts);
+const scanMode = ref<PortScanMode>(initialMode);
 const keyword = ref('');
 const isRefreshing = ref(false);
 const isKilling = ref(false);
@@ -28,12 +31,8 @@ const filteredPorts = computed(() => {
 		return ports.value;
 	}
 
-	if (/^\d+$/.test(value)) {
-		return ports.value.filter(item => item.port === value);
-	}
-
 	return ports.value.filter(item =>
-		[item.port, item.pid, item.command].some(field => field.toLowerCase().includes(value))
+		[item.port, item.pid, item.command, item.type].some(field => field.toLowerCase().includes(value))
 	);
 });
 
@@ -43,7 +42,17 @@ function refreshPorts() {
 	isRefreshing.value = true;
 	errorMessage.value = '';
 	successMessage.value = '';
-	vscode?.postMessage({ type: 'refreshPorts' });
+	vscode?.postMessage({ type: 'refreshPorts', mode: scanMode.value });
+}
+
+function changeScanMode(mode: PortScanMode) {
+	if (scanMode.value === mode) {
+		return;
+	}
+
+	scanMode.value = mode;
+	ports.value = [];
+	refreshPorts();
 }
 
 function openKillConfirm(item: PortInfo) {
@@ -71,7 +80,8 @@ function confirmKillPort() {
 	vscode?.postMessage({
 		type: 'killPort',
 		port: pendingKill.value.port,
-		pid: pendingKill.value.pid
+		pid: pendingKill.value.pid,
+		mode: scanMode.value
 	});
 }
 
@@ -80,6 +90,7 @@ function handleMessage(event: MessageEvent<WebviewMessage>) {
 
 	if (message.type === 'portsUpdated') {
 		ports.value = message.ports ?? [];
+		scanMode.value = message.mode ?? scanMode.value;
 		isRefreshing.value = false;
 		isKilling.value = false;
 		return;
@@ -139,6 +150,10 @@ onUnmounted(() => {
 				<span class="summary-label">筛选结果</span>
 				<strong>{{ filteredPorts.length }}</strong>
 			</div>
+			<div class="mode-switch" role="group" aria-label="扫描模式">
+				<button type="button" :class="{ active: scanMode === 'listening' }" @click="changeScanMode('listening')">监听端口</button>
+				<button type="button" :class="{ active: scanMode === 'all' }" @click="changeScanMode('all')">全部连接</button>
+			</div>
 			<label class="search">
 				<span>搜索</span>
 				<input v-model="keyword" type="search" placeholder="输入端口号精确筛选" />
@@ -153,14 +168,16 @@ onUnmounted(() => {
 				<thead>
 					<tr>
 						<th>端口</th>
+						<th>类型</th>
 						<th>PID</th>
 						<th>程序</th>
 						<th class="action-column">操作</th>
 					</tr>
 				</thead>
 				<tbody>
-					<tr v-for="item in filteredPorts" :key="`${item.port}-${item.pid}-${item.command}`">
+					<tr v-for="item in filteredPorts" :key="`${item.type}-${item.port}-${item.pid}-${item.command}`">
 						<td>{{ item.port }}</td>
+						<td>{{ item.type }}</td>
 						<td>{{ item.pid }}</td>
 						<td>{{ item.command }}</td>
 						<td class="action-column">

@@ -2,7 +2,10 @@ export interface PortInfo {
 	port: string;
 	pid: string;
 	command: string;
+	type: string;
 }
+
+export type PortScanMode = 'listening' | 'all';
 
 export interface GitConfigScope {
 	name: string;
@@ -21,6 +24,7 @@ export interface GitConfigInfo {
 export interface WillumpInitialState {
 	route?: string;
 	ports?: PortInfo[];
+	portScanMode?: PortScanMode;
 }
 
 export interface VsCodeApi {

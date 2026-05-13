@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import * as childProcess from 'child_process';
 import { promisify } from 'util';
-import { CommandSpec, getPortCommandProfile, PortInfo } from './port.commands';
+import { CommandSpec, getPortCommandProfile, PortInfo, PortScanMode } from './port.commands';
 
 /**
  * 检查指定端口的使用情况。
@@ -125,12 +125,14 @@ export async function killProcessOnPort(port: string): Promise<void> {
 	vscode.window.showInformationMessage(`✅ 已终止端口 ${port} 的进程 ${pids.join(', ')}`);
 }
 
-export async function getPortListData(): Promise<PortInfo[]> {
+export async function getPortListData(mode: PortScanMode = 'listening'): Promise<PortInfo[]> {
 	const profile = getPortCommandProfile();
 
 	try {
-		const { stdout } = await executeCommand(profile.listListeningPorts(), { maxBuffer: 1024 * 1024, timeout: 5000 });
-		return profile.parseListeningPorts(stdout);
+		const command = mode === 'all' ? profile.listAllPorts() : profile.listListeningPorts();
+		const { stdout } = await executeCommand(command, { maxBuffer: 1024 * 1024, timeout: 5000 });
+
+		return mode === 'all' ? profile.parseAllPorts(stdout) : profile.parseListeningPorts(stdout);
 	} catch (err) {
 		const execError = err as childProcess.ExecException & { stdout?: string };
 

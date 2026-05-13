@@ -89,7 +89,7 @@ p {
 .summary {
 	display: grid;
 	align-items: center;
-	grid-template-columns: auto auto minmax(260px, 1fr);
+	grid-template-columns: auto auto auto minmax(260px, 1fr);
 	gap: 16px;
 	padding: 12px;
 	border: 1px solid var(--vscode-panel-border);
@@ -106,6 +106,33 @@ p {
 
 .summary strong {
 	font-size: 24px;
+}
+
+.mode-switch {
+	display: inline-flex;
+	overflow: hidden;
+	border: 1px solid var(--vscode-panel-border);
+	border-radius: 4px;
+	background: var(--vscode-editor-background);
+}
+
+.mode-switch button {
+	border: 0;
+	padding: 7px 10px;
+	color: var(--vscode-descriptionForeground);
+	background: transparent;
+	cursor: pointer;
+	white-space: nowrap;
+}
+
+.mode-switch button + button {
+	border-left: 1px solid var(--vscode-panel-border);
+}
+
+.mode-switch button:hover,
+.mode-switch button.active {
+	color: var(--vscode-button-foreground);
+	background: var(--vscode-button-background);
 }
 
 .search {
@@ -360,6 +387,14 @@ tr:last-child td {
 		justify-self: stretch;
 		min-width: 0;
 		width: 100%;
+	}
+
+	.mode-switch {
+		width: 100%;
+	}
+
+	.mode-switch button {
+		flex: 1;
 	}
 
 	.config-grid {

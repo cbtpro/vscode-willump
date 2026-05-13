@@ -60,8 +60,24 @@ suite('Port Command Profile Test Suite', () => {
 		].join('\n');
 
 		assert.deepStrictEqual(profile.parseListeningPorts(stdout), [
-			{ command: 'java', pid: '50324', port: '8080' },
-			{ command: 'node', pid: '61000', port: '3000' }
+			{ command: 'java', pid: '50324', port: '8080', type: 'TCP LISTEN' },
+			{ command: 'node', pid: '61000', port: '3000', type: 'TCP LISTEN' }
+		]);
+	});
+
+	test('parses POSIX all network connections with protocol and state', () => {
+		const profile = getPortCommandProfile('darwin');
+		const stdout = [
+			'COMMAND   PID USER   FD   TYPE DEVICE SIZE/OFF NODE NAME',
+			'java    50324 user   57u  IPv6 123456      0t0  TCP *:8080 (LISTEN)',
+			'Google  83903 user   66u  IPv4 654321      0t0  TCP 127.0.0.1:50100->127.0.0.1:8080 (ESTABLISHED)',
+			'mDNS    200 user   10u  IPv4 111111      0t0  UDP *:5353'
+		].join('\n');
+
+		assert.deepStrictEqual(profile.parseAllPorts(stdout), [
+			{ command: 'java', pid: '50324', port: '8080', type: 'TCP LISTEN' },
+			{ command: 'Google', pid: '83903', port: '50100', type: 'TCP ESTABLISHED' },
+			{ command: 'mDNS', pid: '200', port: '5353', type: 'UDP' }
 		]);
 	});
 
@@ -90,8 +106,40 @@ suite('Port Command Profile Test Suite', () => {
 		].join('\n');
 
 		assert.deepStrictEqual(profile.parseListeningPorts(stdout), [
-			{ command: 'Unknown', pid: '50324', port: '8080' },
-			{ command: 'Unknown', pid: '61000', port: '3000' }
+			{ command: 'Unknown', pid: '50324', port: '8080', type: 'TCP LISTENING' },
+			{ command: 'Unknown', pid: '61000', port: '3000', type: 'TCP LISTENING' }
+		]);
+	});
+
+	test('parses Windows ports from local address and ignores port zero placeholders', () => {
+		const profile = getPortCommandProfile('win32');
+		const stdout = [
+			'  Proto  Local Address          Foreign Address        State           PID',
+			'  TCP    0.0.0.0:5173           0.0.0.0:0              LISTENING       1111',
+			'  TCP    [::]:9229              [::]:0                 LISTENING       2222',
+			'  TCP    0.0.0.0:0              0.0.0.0:0              LISTENING       3333'
+		].join('\n');
+
+		assert.deepStrictEqual(profile.parseListeningPorts(stdout), [
+			{ command: 'Unknown', pid: '1111', port: '5173', type: 'TCP LISTENING' },
+			{ command: 'Unknown', pid: '2222', port: '9229', type: 'TCP LISTENING' }
+		]);
+	});
+
+	test('parses Windows all connections including UDP and non-listening TCP rows', () => {
+		const profile = getPortCommandProfile('win32');
+		const stdout = [
+			'  Proto  Local Address          Foreign Address        State           PID',
+			'  TCP    0.0.0.0:8080           0.0.0.0:0              LISTENING       50324',
+			'  TCP    127.0.0.1:50100        127.0.0.1:8080         ESTABLISHED     83903',
+			'  UDP    0.0.0.0:5353           *:*                                    200',
+			'  TCP    0.0.0.0:0              0.0.0.0:0              LISTENING       3333'
+		].join('\n');
+
+		assert.deepStrictEqual(profile.parseAllPorts(stdout), [
+			{ command: 'Unknown', pid: '50324', port: '8080', type: 'TCP LISTENING' },
+			{ command: 'Unknown', pid: '83903', port: '50100', type: 'TCP ESTABLISHED' },
+			{ command: 'Unknown', pid: '200', port: '5353', type: 'UDP' }
 		]);
 	});
 
