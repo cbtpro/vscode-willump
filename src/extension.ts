@@ -8,7 +8,7 @@ import {
 	getPortListData,
 	killProcessByPid
 } from './utils/common.port';
-import { getGitConfigInfo, updateGitConfig } from './utils/git.config';
+import { getGitConfigInfo, updateGitConfig, updateGitSetting } from './utils/git.config';
 import { Commands } from './constants';
 import { localize } from './i18n';
 
@@ -130,7 +130,7 @@ function getWillumpWebviewHtml(
 		<head>
 			<meta charset="UTF-8">
 			<meta name="viewport" content="width=device-width, initial-scale=1.0">
-			<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource}; script-src 'nonce-${nonce}';">
+			<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource}; script-src ${webview.cspSource} 'nonce-${nonce}';">
 			<link rel="stylesheet" href="${styleUri}">
 			<title>Willump</title>
 		</head>
@@ -209,7 +209,7 @@ class FeaturesViewProvider implements vscode.TreeDataProvider<FeatureItem> {
 
 async function handleWebviewMessage(
 	target: { webview: vscode.Webview },
-	message: { type?: string; port?: string; pid?: string; mode?: 'listening' | 'all'; scope?: 'local' | 'global'; name?: string; email?: string }
+	message: { type?: string; port?: string; pid?: string; mode?: 'listening' | 'all'; scope?: 'local' | 'global'; name?: string; email?: string; key?: string; value?: string }
 ) {
 	if (message?.type === 'refreshPorts') {
 		const mode = message.mode === 'all' ? 'all' : 'listening';
@@ -247,7 +247,7 @@ async function handleWebviewMessage(
 			return;
 		}
 
-		const config = await getGitConfigInfo(workspacePath);
+		const config = await getGitConfigInfo(workspacePath, getWorkspacePaths());
 		target.webview.postMessage({ type: 'gitConfigUpdated', success: true, config });
 		return;
 	}
@@ -269,7 +269,26 @@ async function handleWebviewMessage(
 				},
 				workspacePath
 			);
-			const config = await getGitConfigInfo(workspacePath);
+			const config = await getGitConfigInfo(workspacePath, getWorkspacePaths());
+			target.webview.postMessage({ type: 'gitConfigSaved', success: true, scope: message.scope, config });
+		} catch (err) {
+			const errorMessage = err instanceof Error ? err.message : localize('git.saveFailed');
+			vscode.window.showErrorMessage(errorMessage);
+			target.webview.postMessage({ type: 'gitConfigSaved', success: false, message: errorMessage });
+		}
+	}
+
+	if (message?.type === 'updateGitSetting') {
+		const workspacePath = getWorkspacePath();
+
+		if (!workspacePath || !message.scope || !message.key) {
+			target.webview.postMessage({ type: 'gitConfigSaved', success: false, message: localize('git.saveMissingScope') });
+			return;
+		}
+
+		try {
+			await updateGitSetting(message.scope, message.key, message.value?.trim() ?? '', workspacePath);
+			const config = await getGitConfigInfo(workspacePath, getWorkspacePaths());
 			target.webview.postMessage({ type: 'gitConfigSaved', success: true, scope: message.scope, config });
 		} catch (err) {
 			const errorMessage = err instanceof Error ? err.message : localize('git.saveFailed');
@@ -281,4 +300,8 @@ async function handleWebviewMessage(
 
 function getWorkspacePath(): string | undefined {
 	return vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+}
+
+function getWorkspacePaths(): string[] {
+	return vscode.workspace.workspaceFolders?.map(folder => folder.uri.fsPath) ?? [];
 }

@@ -1,4 +1,8 @@
 <script setup lang="ts">
+import IconSettings from '@arco-design/web-vue/es/icon/icon-settings';
+import IconSort from '@arco-design/web-vue/es/icon/icon-sort';
+import IconSortAscending from '@arco-design/web-vue/es/icon/icon-sort-ascending';
+import IconSortDescending from '@arco-design/web-vue/es/icon/icon-sort-descending';
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { t } from '../i18n';
 import { getVsCodeApi, type PortInfo, type PortScanMode } from '../vscode';
@@ -13,6 +17,9 @@ interface WebviewMessage {
 	message?: string;
 }
 
+type PortColumnKey = 'port' | 'type' | 'pid' | 'command';
+type SortDirection = 'asc' | 'desc' | '';
+
 const vscode = getVsCodeApi();
 const initialPorts = window.__WILLUMP_INITIAL_STATE__?.ports ?? [];
 const initialMode = window.__WILLUMP_INITIAL_STATE__?.portScanMode ?? 'listening';
@@ -24,6 +31,11 @@ const isKilling = ref(false);
 const errorMessage = ref('');
 const successMessage = ref('');
 const pendingKill = ref<PortInfo | null>(null);
+const visibleColumnKeys = ref<PortColumnKey[]>(['port', 'type', 'pid', 'command']);
+const sortState = ref<{ key: PortColumnKey; direction: SortDirection }>({
+	key: 'port',
+	direction: ''
+});
 const isKillConfirmVisible = computed({
 	get: () => Boolean(pendingKill.value),
 	set: visible => {
@@ -46,12 +58,38 @@ const filteredPorts = computed(() => {
 });
 
 const hasKeyword = computed(() => keyword.value.trim().length > 0);
+const portColumns = computed<Array<{ key: PortColumnKey; title: string; width?: number }>>(() => [
+	{ key: 'port', title: t('ports.port'), width: 110 },
+	{ key: 'type', title: t('ports.type'), width: 160 },
+	{ key: 'pid', title: t('ports.pid'), width: 120 },
+	{ key: 'command', title: t('ports.command') }
+]);
+const visiblePortColumns = computed(() => portColumns.value.filter(column => isColumnVisible(column.key)));
 const tableRows = computed(() =>
-	filteredPorts.value.map(item => ({
+	sortPorts(filteredPorts.value).map(item => ({
 		...item,
 		rowId: `${item.type}-${item.port}-${item.pid}-${item.command}`
 	}))
 );
+
+function sortPorts(items: PortInfo[]) {
+	if (!sortState.value.direction) {
+		return items;
+	}
+
+	return [...items].sort((left, right) => {
+		const result = compareColumnValue(left[sortState.value.key], right[sortState.value.key], sortState.value.key);
+		return sortState.value.direction === 'asc' ? result : -result;
+	});
+}
+
+function compareColumnValue(left: string, right: string, key: PortColumnKey) {
+	if (key === 'port' || key === 'pid') {
+		return Number(left) - Number(right);
+	}
+
+	return left.localeCompare(right);
+}
 
 function refreshPorts() {
 	isRefreshing.value = true;
@@ -74,6 +112,43 @@ function handleScanModeChange(value: string | number | boolean) {
 	if (value === 'listening' || value === 'all') {
 		changeScanMode(value);
 	}
+}
+
+function toggleSort(key: PortColumnKey) {
+	if (sortState.value.key !== key) {
+		sortState.value = { key, direction: 'asc' };
+		return;
+	}
+
+	sortState.value = {
+		key,
+		direction: sortState.value.direction === 'asc' ? 'desc' : sortState.value.direction === 'desc' ? '' : 'asc'
+	};
+}
+
+function getSortIcon(key: PortColumnKey) {
+	if (sortState.value.key !== key || !sortState.value.direction) {
+		return IconSort;
+	}
+
+	return sortState.value.direction === 'asc' ? IconSortAscending : IconSortDescending;
+}
+
+function isColumnVisible(key: PortColumnKey) {
+	return visibleColumnKeys.value.includes(key);
+}
+
+function toggleColumnVisible(key: PortColumnKey, checked: string | number | boolean) {
+	if (checked) {
+		visibleColumnKeys.value = Array.from(new Set([...visibleColumnKeys.value, key]));
+		return;
+	}
+
+	if (visibleColumnKeys.value.length <= 1) {
+		return;
+	}
+
+	visibleColumnKeys.value = visibleColumnKeys.value.filter(item => item !== key);
 }
 
 function openKillConfirm(item: PortInfo) {
@@ -186,16 +261,42 @@ onUnmounted(() => {
 			:data="tableRows"
 			:loading="isRefreshing"
 			:pagination="false"
-			:bordered="{ cell: false }"
+			:bordered="{ cell: true }"
 			:scroll="{ x: 620 }"
 			row-key="rowId"
 		>
 			<template #columns>
-				<a-table-column :title="t('ports.port')" data-index="port" :width="110" />
-				<a-table-column :title="t('ports.type')" data-index="type" :width="160" />
-				<a-table-column :title="t('ports.pid')" data-index="pid" :width="120" />
-				<a-table-column :title="t('ports.command')" data-index="command" />
-				<a-table-column :title="t('ports.action')" :width="96" align="right">
+				<a-table-column v-for="column in visiblePortColumns" :key="column.key" :data-index="column.key" :width="column.width">
+					<template #title>
+						<button class="table-header-button" type="button" @click="toggleSort(column.key)">
+							<span>{{ column.title }}</span>
+							<component :is="getSortIcon(column.key)" />
+						</button>
+					</template>
+				</a-table-column>
+				<a-table-column :width="120" align="right">
+					<template #title>
+						<div class="table-action-header">
+							<span>{{ t('ports.action') }}</span>
+							<a-dropdown trigger="click" position="br">
+								<a-button type="text" size="small" :title="t('ports.columnSettings')">
+									<IconSettings />
+								</a-button>
+								<template #content>
+									<div class="column-menu">
+										<a-checkbox
+											v-for="column in portColumns"
+											:key="column.key"
+											:model-value="isColumnVisible(column.key)"
+											@change="checked => toggleColumnVisible(column.key, checked)"
+										>
+											{{ column.title }}
+										</a-checkbox>
+									</div>
+								</template>
+							</a-dropdown>
+						</div>
+					</template>
 					<template #cell="{ record }">
 						<a-button type="text" status="danger" size="small" :disabled="isKilling" @click="openKillConfirm(record)">
 							{{ t('ports.kill') }}

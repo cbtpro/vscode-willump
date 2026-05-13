@@ -21,12 +21,14 @@ export type CommandSpec =
 export interface PortCommandProfile {
 	checkPortUsage(port: string): CommandSpec;
 	findListeningPids(port: string): CommandSpec;
+	getProcessName(pid: string): CommandSpec;
 	killPid(pid: string): CommandSpec;
 	listAllPorts(): CommandSpec;
 	listListeningPorts(): CommandSpec;
 	parseAllPorts(stdout: string): PortInfo[];
 	parseListeningPids(stdout: string, port: string): string[];
 	parseListeningPorts(stdout: string): PortInfo[];
+	parseProcessName(stdout: string, pid: string): string | undefined;
 	isEmptyListeningResult(error: { code?: number | string; stdout?: string }): boolean;
 }
 
@@ -38,6 +40,11 @@ const windowsProfile: PortCommandProfile = {
 	findListeningPids: () => ({
 		type: 'shell',
 		command: 'netstat -ano'
+	}),
+	getProcessName: pid => ({
+		type: 'file',
+		file: 'tasklist',
+		args: ['/FI', `PID eq ${pid}`, '/FO', 'CSV', '/NH']
 	}),
 	killPid: pid => ({
 		type: 'file',
@@ -89,6 +96,12 @@ const windowsProfile: PortCommandProfile = {
 
 		return uniquePorts(ports);
 	},
+	parseProcessName: stdout => {
+		const line = stdout.trim().split(/\r?\n/)[0] ?? '';
+		const firstColumn = parseCsvLine(line)[0];
+
+		return firstColumn && !firstColumn.startsWith('INFO:') ? firstColumn : undefined;
+	},
 	isEmptyListeningResult: () => false
 };
 
@@ -107,6 +120,11 @@ const posixProfile: PortCommandProfile = {
 		type: 'file',
 		file: 'lsof',
 		args: [`-tiTCP:${port}`, '-sTCP:LISTEN']
+	}),
+	getProcessName: pid => ({
+		type: 'file',
+		file: 'ps',
+		args: ['-p', pid, '-o', 'command=']
 	}),
 	killPid: pid => ({
 		type: 'file',
@@ -152,9 +170,16 @@ const posixProfile: PortCommandProfile = {
 			.split('\n')
 			.slice(1)
 			.map(parsePosixLsofLine)
-				.filter((item): item is PortInfo => Boolean(item && item.port && item.port !== '0'));
+			.filter((item): item is PortInfo => Boolean(item && item.port && item.port !== '0'));
 
 		return uniquePorts(ports);
+	},
+	parseProcessName: stdout => {
+		const command = stdout.trim();
+		const executable = command.match(/^"([^"]+)"/)?.[1] ?? command.split(/\s+/)[0] ?? '';
+		const name = executable.split(/[\\/]/).filter(Boolean).pop();
+
+		return name || undefined;
 	},
 	isEmptyListeningResult: error => error.code === 1 && !error.stdout?.trim()
 };
@@ -194,6 +219,39 @@ function parseWindowsNetstatLine(line: string): { protocol: string; port: string
 		state,
 		pid
 	};
+}
+
+function parseCsvLine(line: string): string[] {
+	const values: string[] = [];
+	let current = '';
+	let quoted = false;
+
+	for (let index = 0; index < line.length; index++) {
+		const char = line[index];
+		const nextChar = line[index + 1];
+
+		if (char === '"' && quoted && nextChar === '"') {
+			current += char;
+			index++;
+			continue;
+		}
+
+		if (char === '"') {
+			quoted = !quoted;
+			continue;
+		}
+
+		if (char === ',' && !quoted) {
+			values.push(current);
+			current = '';
+			continue;
+		}
+
+		current += char;
+	}
+
+	values.push(current);
+	return values;
 }
 
 function parsePosixLsofLine(line: string): PortInfo | undefined {

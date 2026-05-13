@@ -102,18 +102,88 @@ input {
 
 .app-controls {
 	display: flex;
-	flex-wrap: wrap;
 	justify-content: flex-end;
 	gap: 8px;
+}
+
+.nav-select {
+	width: 108px;
+}
+
+.select-option {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.table-header-button {
+	display: inline-flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 6px;
+	width: 100%;
+	border: 0;
+	padding: 0;
+	color: var(--willump-text);
+	background: transparent;
+	cursor: pointer;
+	font: inherit;
+	font-weight: 600;
+	text-align: left;
+}
+
+.table-header-button:hover {
+	color: var(--willump-primary);
+}
+
+.table-action-header {
+	display: inline-flex;
+	align-items: center;
+	justify-content: flex-end;
+	gap: 6px;
+	width: 100%;
+}
+
+.column-menu {
+	display: grid;
+	gap: 8px;
+	min-width: 132px;
+	padding: 8px;
+	color: var(--willump-text);
+	background: var(--willump-surface);
 }
 
 .route-tabs {
 	min-width: 0;
 	padding: 0 20px;
+	overflow: hidden;
 }
 
 .route-tabs .arco-tabs-content {
 	display: none;
+}
+
+.route-tabs .arco-tabs-nav-tab-list {
+	min-width: 0;
+}
+
+.route-tabs .arco-tabs-tab {
+	max-width: 180px;
+	color: var(--willump-text-muted);
+	background: var(--willump-surface-soft);
+	border-color: var(--willump-border);
+}
+
+.route-tabs .arco-tabs-tab-active {
+	color: var(--willump-text);
+	background: var(--willump-page-bg);
+}
+
+.route-tab-title {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	min-width: 0;
 }
 
 .page {
@@ -212,7 +282,8 @@ p {
 }
 
 .arco-input-wrapper,
-.arco-radio-button {
+.arco-radio-button,
+.arco-select-view-single {
 	background: var(--willump-input-bg);
 }
 
@@ -263,7 +334,9 @@ p {
 }
 
 .arco-input,
-.arco-input-wrapper .arco-input {
+.arco-input-wrapper .arco-input,
+.arco-select-view-single,
+.arco-select-view-value {
 	color: var(--willump-text);
 	background: transparent;
 }
@@ -323,6 +396,23 @@ p {
 	color: var(--willump-text-subtle);
 }
 
+.arco-trigger-popup,
+.arco-select-dropdown,
+.arco-select-option {
+	color: var(--willump-text);
+	background: var(--willump-surface);
+}
+
+.arco-select-option-hover,
+.arco-select-option:hover {
+	background: var(--willump-fill-hover);
+}
+
+.arco-select-option-selected {
+	color: var(--willump-text);
+	background: var(--willump-fill-active);
+}
+
 .arco-radio-button-content {
 	color: var(--willump-text-muted);
 }
@@ -368,12 +458,12 @@ p {
 		padding: 0 12px 10px;
 	}
 
-	.theme-control {
-		justify-self: start;
-	}
-
 	.app-controls {
 		justify-content: flex-start;
+	}
+
+	.nav-select {
+		width: 112px;
 	}
 
 	.page {

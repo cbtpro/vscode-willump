@@ -15,6 +15,11 @@ suite('Port Command Profile Test Suite', () => {
 			file: 'lsof',
 			args: ['-tiTCP:8080', '-sTCP:LISTEN']
 		});
+		assert.deepStrictEqual(profile.getProcessName('12345'), {
+			type: 'file',
+			file: 'ps',
+			args: ['-p', '12345', '-o', 'command=']
+		});
 		assert.deepStrictEqual(profile.killPid('12345'), {
 			type: 'file',
 			file: 'kill',
@@ -37,6 +42,11 @@ suite('Port Command Profile Test Suite', () => {
 		assert.deepStrictEqual(profile.findListeningPids('8080'), {
 			type: 'shell',
 			command: 'netstat -ano'
+		});
+		assert.deepStrictEqual(profile.getProcessName('12345'), {
+			type: 'file',
+			file: 'tasklist',
+			args: ['/FI', 'PID eq 12345', '/FO', 'CSV', '/NH']
 		});
 		assert.deepStrictEqual(profile.killPid('12345'), {
 			type: 'file',
@@ -85,6 +95,16 @@ suite('Port Command Profile Test Suite', () => {
 		const profile = getPortCommandProfile('linux');
 
 		assert.deepStrictEqual(profile.parseListeningPids('50324\n83903\n50324\nnot-a-pid\n', '8080'), ['50324', '83903']);
+	});
+
+	test('parses POSIX full process names from ps command output', () => {
+		const profile = getPortCommandProfile('darwin');
+
+		assert.strictEqual(
+			profile.parseProcessName('/Applications/Docker.app/Contents/MacOS/com.docker.backend --watch\n', '1000'),
+			'com.docker.backend'
+		);
+		assert.strictEqual(profile.parseProcessName('"ControlCenter" --some-flag\n', '1001'), 'ControlCenter');
 	});
 
 	test('treats empty POSIX lsof result as no listening ports', () => {
@@ -141,6 +161,16 @@ suite('Port Command Profile Test Suite', () => {
 			{ command: 'Unknown', pid: '83903', port: '50100', type: 'TCP ESTABLISHED' },
 			{ command: 'Unknown', pid: '200', port: '5353', type: 'UDP' }
 		]);
+	});
+
+	test('parses Windows process names from tasklist CSV output', () => {
+		const profile = getPortCommandProfile('win32');
+
+		assert.strictEqual(
+			profile.parseProcessName('"com.docker.backend.exe","12345","Console","1","10,000 K"\r\n', '12345'),
+			'com.docker.backend.exe'
+		);
+		assert.strictEqual(profile.parseProcessName('INFO: No tasks are running which match the specified criteria.\r\n', '12345'), undefined);
 	});
 
 	test('parses Windows listening pids by exact local port', () => {

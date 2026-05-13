@@ -133,7 +133,8 @@ export async function getPortListData(mode: PortScanMode = 'listening'): Promise
 		const command = mode === 'all' ? profile.listAllPorts() : profile.listListeningPorts();
 		const { stdout } = await executeCommand(command, { maxBuffer: 1024 * 1024, timeout: 5000 });
 
-		return mode === 'all' ? profile.parseAllPorts(stdout) : profile.parseListeningPorts(stdout);
+		const ports = mode === 'all' ? profile.parseAllPorts(stdout) : profile.parseListeningPorts(stdout);
+		return enrichProcessNames(ports, profile);
 	} catch (err) {
 		const execError = err as childProcess.ExecException & { stdout?: string };
 
@@ -144,6 +145,31 @@ export async function getPortListData(mode: PortScanMode = 'listening'): Promise
 		vscode.window.showErrorMessage(localize('port.list.failed'));
 		return [];
 	}
+}
+
+async function enrichProcessNames(ports: PortInfo[], profile = getPortCommandProfile()): Promise<PortInfo[]> {
+	const namesByPid = new Map<string, string>();
+	const pids = Array.from(new Set(ports.map(item => item.pid).filter(pid => /^\d+$/.test(pid))));
+
+	await Promise.all(
+		pids.map(async pid => {
+			try {
+				const { stdout } = await executeCommand(profile.getProcessName(pid), { maxBuffer: 1024 * 64, timeout: 2500 });
+				const name = profile.parseProcessName(stdout, pid);
+
+				if (name) {
+					namesByPid.set(pid, name);
+				}
+			} catch (err) {
+				// Keep the original command from the port scanner when process lookup is unavailable.
+			}
+		})
+	);
+
+	return ports.map(item => ({
+		...item,
+		command: namesByPid.get(item.pid) ?? item.command
+	}));
 }
 
 async function getListeningPidsByPort(port: string): Promise<string[]> {

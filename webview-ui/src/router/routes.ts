@@ -1,19 +1,22 @@
-import { computed, ref } from 'vue';
-import GitConfigPage from '../pages/GitConfigPage.vue';
-import PortsPage from '../pages/PortsPage.vue';
+import { computed, defineAsyncComponent, ref } from 'vue';
 
 export const routes = [
 	{
 		path: '/ports',
 		labelKey: 'nav.ports',
-		component: PortsPage
+		icon: 'ports',
+		component: defineAsyncComponent(() => import('../pages/PortsPage.vue'))
 	},
 	{
 		path: '/dev-config/git',
 		labelKey: 'nav.gitConfig',
-		component: GitConfigPage
+		icon: 'git',
+		component: defineAsyncComponent(() => import('../pages/GitConfigPage.vue'))
 	}
 ] as const;
+
+export type RoutePath = (typeof routes)[number]['path'];
+export type WillumpRoute = (typeof routes)[number];
 
 const initialRoute = window.__WILLUMP_INITIAL_STATE__?.route ?? '/ports';
 const currentPath = ref(normalizeRoute(initialRoute));

@@ -19,6 +19,58 @@ export interface GitConfigInfo {
 	local: GitConfigScope;
 	global: GitConfigScope;
 	workspacePath: string;
+	workspaces: GitWorkspaceOverview[];
+	effectiveIdentity: {
+		name: string;
+		email: string;
+		source: string;
+		isGithubNoreply: boolean;
+	};
+	git: {
+		available: boolean;
+		version: string;
+		path: string;
+		error?: string;
+	};
+	remote: {
+		remotes: Array<{ name: string; url: string }>;
+	};
+	branch: {
+		current: string;
+		upstream: string;
+	};
+	pushDefault: string;
+	lineEnding: {
+		autocrlf: string;
+		eol: string;
+		ignorecase: string;
+	};
+	editor: string;
+	ssh: {
+		publicKeys: string[];
+		agentKeys: string[];
+		error?: string;
+	};
+	hooks: Array<{ name: string; executable: boolean }>;
+	lfs: {
+		available: boolean;
+		version: string;
+		enabled: boolean;
+	};
+}
+
+export interface GitWorkspaceOverview {
+	name: string;
+	path: string;
+	localName: string;
+	localEmail: string;
+	effectiveName: string;
+	effectiveEmail: string;
+	branch: string;
+	upstream: string;
+	remote: string;
+	available: boolean;
+	error?: string;
 }
 
 export interface WillumpInitialState {
