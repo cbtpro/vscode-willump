@@ -1,0 +1,10 @@
+languageIds:
+  - javascript
+  - typescript
+  - vue
+
+usageMatchRegex:
+  - "[^\\w\\d]t\\(['\"`]({key})['\"`]"
+
+refactorTemplates:
+  - "t('{key}')"

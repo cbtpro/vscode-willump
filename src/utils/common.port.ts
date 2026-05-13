@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import * as childProcess from 'child_process';
 import { promisify } from 'util';
+import { localize } from '../i18n';
 import { CommandSpec, getPortCommandProfile, PortInfo, PortScanMode } from './port.commands';
 
 /**
@@ -15,15 +16,15 @@ export function checkPortUsage(port: string) {
 	executeCommand(profile.checkPortUsage(port), { maxBuffer: 1024 * 1024 })
 		.then(({ stdout }) => {
 			if (!stdout.trim()) {
-				vscode.window.showInformationMessage(`✅ 端口 ${port} 没有被占用`);
+				vscode.window.showInformationMessage(localize('port.check.available', { port }));
 				return;
 			}
 
-			vscode.window.showWarningMessage(`❌ 端口 ${port} 已被占用：\n${stdout}`);
+			vscode.window.showWarningMessage(localize('port.check.occupied', { port, output: stdout }));
 		})
 		// 如果执行命令过程中出现错误、有标准错误输出或者没有输出结果
 		.catch(() => {
-			vscode.window.showInformationMessage(`✅ 端口 ${port} 没有被占用`);
+			vscode.window.showInformationMessage(localize('port.check.available', { port }));
 		});
 }
 
@@ -42,14 +43,14 @@ export function listAllPorts() {
 			// 清空输出通道中的原有内容
 			outputChannel.clear();
 			// 向输出通道添加标题行
-			outputChannel.appendLine('📡 当前占用端口：');
+			outputChannel.appendLine(localize('port.output.title'));
 			// 向输出通道添加命令执行结果
 			outputChannel.appendLine(stdout);
 			// 显示输出通道
 			outputChannel.show();
 		})
 		.catch(() => {
-			vscode.window.showErrorMessage('❌ 获取端口信息失败');
+			vscode.window.showErrorMessage(localize('port.list.failed'));
 		});
 }
 
@@ -81,29 +82,29 @@ async function executeCommand(command: CommandSpec, options: childProcess.ExecOp
 
 export async function killProcessByPid(port: string, pid: string): Promise<void> {
 	if (!/^\d+$/.test(pid)) {
-		throw new Error(`无效的进程 PID：${pid}`);
+		throw new Error(localize('port.invalidPid', { pid }));
 	}
 
 	const profile = getPortCommandProfile();
 
 	try {
 		await executeCommand(profile.killPid(pid), { timeout: 5000 });
-		vscode.window.showInformationMessage(`✅ 已终止端口 ${port} 的进程 ${pid}`);
+		vscode.window.showInformationMessage(localize('port.kill.success', { port, pid }));
 	} catch (err) {
-		throw new Error(`无法终止端口 ${port} 的进程 ${pid}`);
+		throw new Error(localize('port.kill.failed', { port, pid }));
 	}
 }
 
 export async function killProcessOnPort(port: string): Promise<void> {
 	if (!/^\d+$/.test(port)) {
-		vscode.window.showErrorMessage(`❌ 无效的端口：${port}`);
+		vscode.window.showErrorMessage(localize('port.invalid', { port }));
 		return;
 	}
 
 	const pids = await getListeningPidsByPort(port);
 
 	if (!pids.length) {
-		vscode.window.showInformationMessage(`✅ 端口 ${port} 没有被占用`);
+		vscode.window.showInformationMessage(localize('port.check.available', { port }));
 		return;
 	}
 
@@ -118,11 +119,11 @@ export async function killProcessOnPort(port: string): Promise<void> {
 	}
 
 	if (failedPids.length) {
-		vscode.window.showErrorMessage(`❌ 无法终止端口 ${port} 的进程 ${failedPids.join(', ')}`);
+		vscode.window.showErrorMessage(localize('port.kill.failedMany', { port, pids: failedPids.join(', ') }));
 		return;
 	}
 
-	vscode.window.showInformationMessage(`✅ 已终止端口 ${port} 的进程 ${pids.join(', ')}`);
+	vscode.window.showInformationMessage(localize('port.kill.success', { port, pid: pids.join(', ') }));
 }
 
 export async function getPortListData(mode: PortScanMode = 'listening'): Promise<PortInfo[]> {
@@ -140,7 +141,7 @@ export async function getPortListData(mode: PortScanMode = 'listening'): Promise
 			return [];
 		}
 
-		vscode.window.showErrorMessage('❌ 获取端口数据失败');
+		vscode.window.showErrorMessage(localize('port.list.failed'));
 		return [];
 	}
 }

@@ -22,6 +22,7 @@ export interface GitConfigInfo {
 }
 
 export interface WillumpInitialState {
+	language?: string;
 	route?: string;
 	ports?: PortInfo[];
 	portScanMode?: PortScanMode;

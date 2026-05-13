@@ -5,12 +5,12 @@ import PortsPage from '../pages/PortsPage.vue';
 export const routes = [
 	{
 		path: '/ports',
-		label: '端口占用',
+		labelKey: 'nav.ports',
 		component: PortsPage
 	},
 	{
 		path: '/dev-config/git',
-		label: 'Git 开发配置',
+		labelKey: 'nav.gitConfig',
 		component: GitConfigPage
 	}
 ] as const;

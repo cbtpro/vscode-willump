@@ -1,0 +1,9 @@
+{
+  "extension.description": "Willump",
+  "view.features.name": "Features",
+  "command.checkPort.title": "Willump: Check Port Usage",
+  "command.killPort.title": "Willump: Terminate Process on Port",
+  "command.listPorts.title": "Willump: Show All Port Usage",
+  "command.viewPorts.title": "Willump: View Ports",
+  "command.viewGitConfig.title": "Willump: View Git Config"
+}

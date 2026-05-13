@@ -6,6 +6,19 @@
 	"search.exclude": {
 		"out": true // set this to false to include "out" folder in search results
 	},
+	"i18n-ally.enabledFrameworks": [
+		"custom",
+		"vue"
+	],
+	"i18n-ally.enabledParsers": [
+		"json"
+	],
+	"i18n-ally.localesPaths": [
+		"webview-ui/src/locales"
+	],
+	"i18n-ally.sourceLanguage": "zh-CN",
+	"i18n-ally.displayLanguage": "zh-CN",
+	"i18n-ally.keystyle": "nested",
 	// Turn off tsc task auto detection since we have the necessary tasks as npm scripts
 	"typescript.tsc.autoDetect": "off"
 }

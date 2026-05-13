@@ -10,12 +10,14 @@ import {
 } from './utils/common.port';
 import { getGitConfigInfo, updateGitConfig } from './utils/git.config';
 import { Commands } from './constants';
+import { localize } from './i18n';
 
 const FEATURES_VIEW_TYPE = 'willump.featuresView';
 const ROUTES = {
 	PORTS: '/ports',
 	GIT_CONFIG: '/dev-config/git'
 } as const;
+let willumpPanel: vscode.WebviewPanel | undefined;
 
 // This method is called when your extension is activated
 // Your extension is activated the very first time the command is executed
@@ -27,7 +29,7 @@ export function activate(context: vscode.ExtensionContext) {
 	// 新的 checkPort 命令
 	const checkPortCommand = vscode.commands.registerCommand(Commands.CHECK_PORT, async () => {
 		const input = await vscode.window.showInputBox({
-			prompt: '请输入要检查的端口（用空格分隔），例如：3000 8080',
+			prompt: localize('command.checkPort.prompt'),
 			placeHolder: '3000 8080'
 		});
 
@@ -49,7 +51,7 @@ export function activate(context: vscode.ExtensionContext) {
 	context.subscriptions.push(
 		vscode.commands.registerCommand(Commands.KILL_PORT, async () => {
 			const input = await vscode.window.showInputBox({
-				prompt: '输入要终止进程的端口（用空格分隔）',
+				prompt: localize('command.killPort.prompt'),
 				placeHolder: '3000 8080'
 			});
 			if (!input) {
@@ -69,13 +71,12 @@ export function activate(context: vscode.ExtensionContext) {
 	);
 	context.subscriptions.push(
 		vscode.commands.registerCommand(Commands.VIEW_PORTS, async () => {
-			const portsInfo = await getPortListData('listening');
-			openWillumpWebview(context, '当前端口占用情况', ROUTES.PORTS, { ports: portsInfo, portScanMode: 'listening' });
+			openWillumpWebview(context, 'Willump', ROUTES.PORTS, { portScanMode: 'listening' });
 		})
 	);
 	context.subscriptions.push(
 		vscode.commands.registerCommand(Commands.VIEW_GIT_CONFIG, async () => {
-			openWillumpWebview(context, 'Git 开发配置', ROUTES.GIT_CONFIG);
+			openWillumpWebview(context, localize('git.title'), ROUTES.GIT_CONFIG);
 		})
 	);
 	context.subscriptions.push(vscode.window.registerTreeDataProvider(FEATURES_VIEW_TYPE, new FeaturesViewProvider()));
@@ -85,16 +86,33 @@ export function activate(context: vscode.ExtensionContext) {
 export function deactivate() {}
 
 function openWillumpWebview(context: vscode.ExtensionContext, title: string, route: string, state: Record<string, unknown> = {}) {
+	if (willumpPanel) {
+		willumpPanel.title = title;
+		willumpPanel.reveal(vscode.ViewColumn.One);
+		willumpPanel.webview.postMessage({
+			type: 'navigate',
+			route,
+			...state
+		});
+		return;
+	}
+
 	const panel = vscode.window.createWebviewPanel('willumpView', title, vscode.ViewColumn.One, {
 		enableScripts: true,
+		retainContextWhenHidden: true,
 		localResourceRoots: [vscode.Uri.joinPath(context.extensionUri, 'dist', 'webview')]
 	});
+	willumpPanel = panel;
 
 	panel.webview.html = getWillumpWebviewHtml(panel.webview, context.extensionUri, {
+		language: vscode.env.language,
 		route,
 		...state
 	});
 	panel.webview.onDidReceiveMessage(message => handleWebviewMessage(panel, message), undefined, context.subscriptions);
+	panel.onDidDispose(() => {
+		willumpPanel = undefined;
+	});
 }
 
 function getWillumpWebviewHtml(
@@ -107,7 +125,7 @@ function getWillumpWebviewHtml(
 	const nonce = getNonce();
 	const serializedState = JSON.stringify(initialState).replace(/</g, '\\u003c');
 
-	return `<!doctype html>
+		return `<!doctype html>
 	<html lang="zh-CN">
 		<head>
 			<meta charset="UTF-8">
@@ -147,7 +165,13 @@ class FeatureItem extends vscode.TreeItem {
 }
 
 class FeaturesViewProvider implements vscode.TreeDataProvider<FeatureItem> {
-	private readonly devConfig = new FeatureItem('开发配置', 'Git / 后续更多配置', 'settings-gear', undefined, vscode.TreeItemCollapsibleState.Expanded);
+	private readonly devConfig = new FeatureItem(
+		localize('feature.devConfig.title'),
+		localize('feature.devConfig.description'),
+		'settings-gear',
+		undefined,
+		vscode.TreeItemCollapsibleState.Expanded
+	);
 
 	getTreeItem(element: FeatureItem): vscode.TreeItem {
 		return element;
@@ -157,12 +181,12 @@ class FeaturesViewProvider implements vscode.TreeDataProvider<FeatureItem> {
 		if (element === this.devConfig) {
 			return [
 				new FeatureItem(
-					'Git',
-					'作者 / 邮箱',
+					localize('feature.devConfig.git.title'),
+					localize('feature.devConfig.git.description'),
 					'git-branch',
 					{
 						command: Commands.VIEW_GIT_CONFIG,
-						title: '打开 Git 开发配置'
+						title: localize('feature.devConfig.git.open')
 					}
 				)
 			];
@@ -170,12 +194,12 @@ class FeaturesViewProvider implements vscode.TreeDataProvider<FeatureItem> {
 
 		return [
 			new FeatureItem(
-				'端口占用',
-				'查看 / 搜索 / 终止',
+				localize('feature.ports.title'),
+				localize('feature.ports.description'),
 				'plug',
 				{
 					command: Commands.VIEW_PORTS,
-					title: '打开端口占用视图'
+					title: localize('feature.ports.open')
 				}
 			),
 			this.devConfig
@@ -196,7 +220,7 @@ async function handleWebviewMessage(
 
 	if (message?.type === 'killPort') {
 		if (!message.port || !message.pid) {
-			target.webview.postMessage({ type: 'error', message: '缺少端口或进程信息，无法终止进程' });
+			target.webview.postMessage({ type: 'error', message: localize('port.kill.missing') });
 			return;
 		}
 
@@ -207,7 +231,7 @@ async function handleWebviewMessage(
 			const ports = await getPortListData(mode);
 			target.webview.postMessage({ type: 'portsUpdated', ports, mode });
 		} catch (err) {
-			const errorMessage = err instanceof Error ? err.message : '终止进程失败';
+			const errorMessage = err instanceof Error ? err.message : localize('port.killResult.failed');
 			vscode.window.showErrorMessage(errorMessage);
 			target.webview.postMessage({ type: 'killResult', success: false, message: errorMessage });
 		}
@@ -219,7 +243,7 @@ async function handleWebviewMessage(
 		const workspacePath = getWorkspacePath();
 
 		if (!workspacePath) {
-			target.webview.postMessage({ type: 'gitConfigUpdated', success: false, message: '当前没有打开工作区，无法读取项目 Git 配置' });
+			target.webview.postMessage({ type: 'gitConfigUpdated', success: false, message: localize('git.noWorkspace') });
 			return;
 		}
 
@@ -232,7 +256,7 @@ async function handleWebviewMessage(
 		const workspacePath = getWorkspacePath();
 
 		if (!workspacePath || !message.scope) {
-			target.webview.postMessage({ type: 'gitConfigSaved', success: false, message: '缺少工作区或配置范围，无法保存 Git 配置' });
+			target.webview.postMessage({ type: 'gitConfigSaved', success: false, message: localize('git.saveMissingScope') });
 			return;
 		}
 
@@ -248,7 +272,7 @@ async function handleWebviewMessage(
 			const config = await getGitConfigInfo(workspacePath);
 			target.webview.postMessage({ type: 'gitConfigSaved', success: true, scope: message.scope, config });
 		} catch (err) {
-			const errorMessage = err instanceof Error ? err.message : '保存 Git 配置失败';
+			const errorMessage = err instanceof Error ? err.message : localize('git.saveFailed');
 			vscode.window.showErrorMessage(errorMessage);
 			target.webview.postMessage({ type: 'gitConfigSaved', success: false, message: errorMessage });
 		}

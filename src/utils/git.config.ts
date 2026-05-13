@@ -1,5 +1,6 @@
 import * as childProcess from 'child_process';
 import { promisify } from 'util';
+import { localize } from '../i18n';
 
 const execFileAsync = promisify(childProcess.execFile);
 
@@ -61,7 +62,7 @@ async function readScope(scope: 'local' | 'global', workspacePath?: string): Pro
 			available: true
 		};
 	} catch (err) {
-		const error = err instanceof Error ? err.message : '读取 Git 配置失败';
+		const error = err instanceof Error ? err.message : localize('git.loadFailed');
 
 		return {
 			name: '',

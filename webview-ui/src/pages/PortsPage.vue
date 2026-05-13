@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { t } from '../i18n';
 import { getVsCodeApi, type PortInfo, type PortScanMode } from '../vscode';
 
 interface WebviewMessage {
@@ -23,6 +24,14 @@ const isKilling = ref(false);
 const errorMessage = ref('');
 const successMessage = ref('');
 const pendingKill = ref<PortInfo | null>(null);
+const isKillConfirmVisible = computed({
+	get: () => Boolean(pendingKill.value),
+	set: visible => {
+		if (!visible) {
+			closeKillConfirm();
+		}
+	}
+});
 
 const filteredPorts = computed(() => {
 	const value = keyword.value.trim().toLowerCase();
@@ -37,6 +46,12 @@ const filteredPorts = computed(() => {
 });
 
 const hasKeyword = computed(() => keyword.value.trim().length > 0);
+const tableRows = computed(() =>
+	filteredPorts.value.map(item => ({
+		...item,
+		rowId: `${item.type}-${item.port}-${item.pid}-${item.command}`
+	}))
+);
 
 function refreshPorts() {
 	isRefreshing.value = true;
@@ -53,6 +68,12 @@ function changeScanMode(mode: PortScanMode) {
 	scanMode.value = mode;
 	ports.value = [];
 	refreshPorts();
+}
+
+function handleScanModeChange(value: string | number | boolean) {
+	if (value === 'listening' || value === 'all') {
+		changeScanMode(value);
+	}
 }
 
 function openKillConfirm(item: PortInfo) {
@@ -100,17 +121,20 @@ function handleMessage(event: MessageEvent<WebviewMessage>) {
 		isKilling.value = false;
 
 		if (message.success) {
-			successMessage.value = `已终止端口 ${message.port} 的进程 ${message.pid}`;
+			successMessage.value = t('ports.killSuccess', {
+				port: message.port ?? '',
+				pid: message.pid ?? ''
+			});
 			pendingKill.value = null;
 			return;
 		}
 
-		errorMessage.value = message.message ?? '终止进程失败';
+		errorMessage.value = message.message ?? t('ports.killFailed');
 		return;
 	}
 
 	if (message.type === 'error') {
-		errorMessage.value = message.message ?? '获取端口数据失败';
+		errorMessage.value = message.message ?? t('ports.loadFailed');
 		isRefreshing.value = false;
 		isKilling.value = false;
 	}
@@ -133,96 +157,68 @@ onUnmounted(() => {
 	<main class="page">
 		<header class="toolbar">
 			<div>
-				<h1>端口占用</h1>
-				<p>查看当前系统端口、PID 和占用程序。</p>
+				<h1>{{ t('ports.title') }}</h1>
+				<p>{{ t('ports.subtitle') }}</p>
 			</div>
-			<button class="refresh-button" type="button" :disabled="isRefreshing" @click="refreshPorts">
-				{{ isRefreshing ? '刷新中' : '刷新' }}
-			</button>
+			<a-button type="primary" :loading="isRefreshing" @click="refreshPorts">{{ t('common.refresh') }}</a-button>
 		</header>
 
-		<section class="summary">
+		<a-card class="summary" :bordered="false">
 			<div>
-				<span class="summary-label">占用端口</span>
+				<span class="summary-label">{{ t('ports.occupiedCount') }}</span>
 				<strong>{{ ports.length }}</strong>
 			</div>
 			<div>
-				<span class="summary-label">筛选结果</span>
+				<span class="summary-label">{{ t('ports.filterCount') }}</span>
 				<strong>{{ filteredPorts.length }}</strong>
 			</div>
-			<div class="mode-switch" role="group" aria-label="扫描模式">
-				<button type="button" :class="{ active: scanMode === 'listening' }" @click="changeScanMode('listening')">监听端口</button>
-				<button type="button" :class="{ active: scanMode === 'all' }" @click="changeScanMode('all')">全部连接</button>
+			<a-radio-group :model-value="scanMode" type="button" @change="handleScanModeChange">
+				<a-radio value="listening">{{ t('ports.listening') }}</a-radio>
+				<a-radio value="all">{{ t('ports.allConnections') }}</a-radio>
+			</a-radio-group>
+			<a-input-search v-model="keyword" class="search" allow-clear :placeholder="t('ports.searchPlaceholder')" />
+		</a-card>
+
+		<a-alert v-if="successMessage" type="success" :content="successMessage" />
+		<a-alert v-if="errorMessage" type="error" :content="errorMessage" />
+
+		<a-table
+			:data="tableRows"
+			:loading="isRefreshing"
+			:pagination="false"
+			:bordered="{ cell: false }"
+			:scroll="{ x: 620 }"
+			row-key="rowId"
+		>
+			<template #columns>
+				<a-table-column :title="t('ports.port')" data-index="port" :width="110" />
+				<a-table-column :title="t('ports.type')" data-index="type" :width="160" />
+				<a-table-column :title="t('ports.pid')" data-index="pid" :width="120" />
+				<a-table-column :title="t('ports.command')" data-index="command" />
+				<a-table-column :title="t('ports.action')" :width="96" align="right">
+					<template #cell="{ record }">
+						<a-button type="text" status="danger" size="small" :disabled="isKilling" @click="openKillConfirm(record)">
+							{{ t('ports.kill') }}
+						</a-button>
+					</template>
+				</a-table-column>
+			</template>
+			<template #empty>
+				<a-empty :description="hasKeyword ? t('ports.noMatch') : t('ports.empty')" />
+			</template>
+		</a-table>
+
+		<a-modal v-model:visible="isKillConfirmVisible" :title="t('ports.confirmKillTitle')" :footer="false" :mask-closable="!isKilling">
+			<p>{{ t('ports.confirmKillDescription') }}</p>
+			<a-descriptions v-if="pendingKill" class="process-detail" :column="1" bordered>
+				<a-descriptions-item :label="t('ports.port')">{{ pendingKill.port }}</a-descriptions-item>
+				<a-descriptions-item :label="t('ports.pid')">{{ pendingKill.pid }}</a-descriptions-item>
+				<a-descriptions-item :label="t('ports.command')">{{ pendingKill.command }}</a-descriptions-item>
+			</a-descriptions>
+			<div class="dialog-actions">
+				<a-button :disabled="isKilling" @click="closeKillConfirm">{{ t('common.cancel') }}</a-button>
+				<a-button type="primary" status="danger" :loading="isKilling" @click="confirmKillPort">{{ t('ports.confirmKill') }}</a-button>
 			</div>
-			<label class="search">
-				<span>搜索</span>
-				<input v-model="keyword" type="search" placeholder="输入端口号精确筛选" />
-			</label>
-		</section>
-
-		<p v-if="successMessage" class="success-message">{{ successMessage }}</p>
-		<p v-if="errorMessage" class="error-message">{{ errorMessage }}</p>
-
-		<section class="table-wrap">
-			<table v-if="filteredPorts.length">
-				<thead>
-					<tr>
-						<th>端口</th>
-						<th>类型</th>
-						<th>PID</th>
-						<th>程序</th>
-						<th class="action-column">操作</th>
-					</tr>
-				</thead>
-				<tbody>
-					<tr v-for="item in filteredPorts" :key="`${item.type}-${item.port}-${item.pid}-${item.command}`">
-						<td>{{ item.port }}</td>
-						<td>{{ item.type }}</td>
-						<td>{{ item.pid }}</td>
-						<td>{{ item.command }}</td>
-						<td class="action-column">
-							<button class="danger-button" type="button" :disabled="isKilling" @click="openKillConfirm(item)">
-								终止
-							</button>
-						</td>
-					</tr>
-				</tbody>
-			</table>
-			<div v-else class="empty">
-				<strong>{{ hasKeyword ? '没有匹配的端口' : '暂无端口数据' }}</strong>
-				<span>{{ hasKeyword ? '请尝试更换搜索条件，或点击刷新重新读取。' : '可以点击刷新重新读取当前系统端口占用情况。' }}</span>
-			</div>
-		</section>
-
-		<div v-if="pendingKill" class="modal-mask" role="presentation" @click.self="closeKillConfirm">
-			<section class="confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="confirm-title">
-				<header>
-					<h2 id="confirm-title">确认终止进程</h2>
-					<p>该操作会强制结束占用端口的进程，请确认它不是重要服务。</p>
-				</header>
-
-				<dl class="process-detail">
-					<div>
-						<dt>端口</dt>
-						<dd>{{ pendingKill.port }}</dd>
-					</div>
-					<div>
-						<dt>PID</dt>
-						<dd>{{ pendingKill.pid }}</dd>
-					</div>
-					<div>
-						<dt>程序</dt>
-						<dd>{{ pendingKill.command }}</dd>
-					</div>
-				</dl>
-
-				<footer class="dialog-actions">
-					<button class="secondary-button" type="button" :disabled="isKilling" @click="closeKillConfirm">取消</button>
-					<button class="danger-button" type="button" :disabled="isKilling" @click="confirmKillPort">
-						{{ isKilling ? '处理中' : '确认终止' }}
-					</button>
-				</footer>
-			</section>
-		</div>
+		</a-modal>
 	</main>
 </template>

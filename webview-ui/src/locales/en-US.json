@@ -1,0 +1,66 @@
+{
+  "common": {
+    "auto": "Auto",
+    "cancel": "Cancel",
+    "dark": "Dark",
+    "light": "Light",
+    "refresh": "Refresh",
+    "refreshing": "Refreshing",
+    "save": "Save",
+    "saving": "Saving"
+  },
+  "language": {
+    "chinese": "Chinese",
+    "english": "English",
+    "label": "Language"
+  },
+  "nav": {
+    "gitConfig": "Git Config",
+    "ports": "Ports"
+  },
+  "ports": {
+    "action": "Action",
+    "allConnections": "All Connections",
+    "command": "Program",
+    "confirmKill": "Confirm Terminate",
+    "confirmKillDescription": "This will force quit the process using the port. Make sure it is not an important service.",
+    "confirmKillTitle": "Confirm Process Termination",
+    "empty": "No port data",
+    "filterCount": "Filtered",
+    "kill": "Terminate",
+    "killFailed": "Failed to terminate process",
+    "killSuccess": "Terminated process {pid} on port {port}",
+    "listening": "Listening Ports",
+    "loadFailed": "Failed to load port data",
+    "noMatch": "No matching ports",
+    "occupiedCount": "Ports",
+    "pid": "PID",
+    "port": "Port",
+    "searchPlaceholder": "Search port, PID, program, or type",
+    "subtitle": "View local ports, PIDs, and owning programs.",
+    "title": "Ports",
+    "type": "Type"
+  },
+  "git": {
+    "author": "Author",
+    "currentProject": "Current project",
+    "currentProjectConfig": "Current Project",
+    "currentProjectDescription": "Write to this repository `.git/config`; only this project is affected.",
+    "email": "Email",
+    "globalConfig": "Global Config",
+    "globalDescription": "Write to global Git config as the default author info for repositories.",
+    "globalEmpty": "No global Git author info configured",
+    "loadFailed": "Failed to read Git config",
+    "localEmpty": "No project Git author info configured",
+    "saveCurrent": "Save Project Config",
+    "saveCurrentSuccess": "Saved project Git author info",
+    "saveFailed": "Failed to save Git config",
+    "saveGlobal": "Save Global Config",
+    "saveGlobalSuccess": "Saved global Git author info",
+    "subtitle": "View and edit project and global Git author and email settings.",
+    "title": "Git Config"
+  },
+  "theme": {
+    "label": "Theme"
+  }
+}
