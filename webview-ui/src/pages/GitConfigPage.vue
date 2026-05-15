@@ -5,6 +5,9 @@ import { getVsCodeApi, type GitConfigInfo, type GitConfigScope } from '../vscode
 import GitOverview from '../components/git/GitOverview.vue';
 import GitIdentity from '../components/git/GitIdentity.vue';
 import GitTemplates from '../components/git/GitTemplates.vue';
+import GitRemote from '../components/git/GitRemote.vue';
+import GitPolicy from '../components/git/GitPolicy.vue';
+import GitSystem from '../components/git/GitSystem.vue';
 
 interface GitMessage {
 	type: 'gitConfigUpdated' | 'gitConfigSaved';
@@ -226,90 +229,15 @@ onUnmounted(() => {
 			</a-collapse-item>
 
 			<a-collapse-item key="remote" :header="t('git.sections.remote')">
-				<a-descriptions :column="1" bordered>
-					<a-descriptions-item :label="t('git.branch')">{{ config?.branch.current || '-' }}</a-descriptions-item>
-					<a-descriptions-item :label="t('git.upstream')">{{ config?.branch.upstream || t('git.noUpstream') }}</a-descriptions-item>
-				</a-descriptions>
-				<a-table class="section-table" :data="remoteRows" :pagination="false" :bordered="{ cell: true }" :scroll="{ x: 760 }" row-key="name">
-					<template #columns>
-						<a-table-column title="Remote" data-index="name" :width="180" />
-						<a-table-column title="URL" data-index="url" :width="560" />
-					</template>
-				</a-table>
+				<GitRemote :remote-rows="remoteRows" :branch="config?.branch" />
 			</a-collapse-item>
 
 			<a-collapse-item key="policy" :header="t('git.sections.policy')">
-				<section class="config-grid">
-					<a-card class="config-panel" title="push.default" :bordered="false">
-						<p>{{ t('git.pushDefaultTip') }}</p>
-						<a-select v-model="form.pushDefault" allow-clear>
-							<a-option value="simple">simple</a-option>
-							<a-option value="current">current</a-option>
-							<a-option value="upstream">upstream</a-option>
-							<a-option value="matching">matching</a-option>
-						</a-select>
-						<a-button type="primary" :loading="isSaving === 'push.default'" @click="saveGitSetting('global', 'push.default', form.pushDefault)">
-							{{ t('common.save') }}
-						</a-button>
-					</a-card>
-					<a-card class="config-panel" :title="t('git.lineEndingTitle')" :bordered="false">
-						<p>{{ t('git.lineEndingTip') }}</p>
-						<a-form :model="form" layout="vertical">
-							<a-form-item label="core.autocrlf"><a-input v-model="form.autocrlf" placeholder="input / true / false" /></a-form-item>
-							<a-form-item label="core.eol"><a-input v-model="form.eol" placeholder="lf / crlf / native" /></a-form-item>
-							<a-form-item label="core.ignorecase"><a-input v-model="form.ignorecase" placeholder="true / false" /></a-form-item>
-						</a-form>
-						<a-space wrap>
-							<a-button @click="saveGitSetting('local', 'core.autocrlf', form.autocrlf)">core.autocrlf</a-button>
-							<a-button @click="saveGitSetting('local', 'core.eol', form.eol)">core.eol</a-button>
-							<a-button @click="saveGitSetting('local', 'core.ignorecase', form.ignorecase)">core.ignorecase</a-button>
-						</a-space>
-					</a-card>
-					<a-card class="config-panel" :title="t('git.editorTitle')" :bordered="false">
-						<p>{{ t('git.editorTip') }}</p>
-						<a-input v-model="form.editor" placeholder="code --wait" />
-						<a-space>
-							<a-button @click="form.editor = 'code --wait'">VS Code</a-button>
-							<a-button type="primary" :loading="isSaving === 'core.editor'" @click="saveGitSetting('global', 'core.editor', form.editor)">
-								{{ t('common.save') }}
-							</a-button>
-						</a-space>
-					</a-card>
-				</section>
+				<GitPolicy :form="form" :is-saving="isSaving" :save-setting="saveGitSetting" />
 			</a-collapse-item>
 
 			<a-collapse-item key="system" :header="t('git.sections.system')">
-				<section class="config-grid">
-					<a-card class="config-panel" :title="t('git.availability')" :bordered="false">
-						<a-descriptions :column="1" bordered>
-							<a-descriptions-item label="Git">{{ config?.git.available ? t('common.available') : t('common.unavailable') }}</a-descriptions-item>
-							<a-descriptions-item :label="t('common.version')">{{ config?.git.version || '-' }}</a-descriptions-item>
-							<a-descriptions-item :label="t('common.path')">{{ config?.git.path || '-' }}</a-descriptions-item>
-						</a-descriptions>
-					</a-card>
-					<a-card class="config-panel" :title="t('git.sshStatus')" :bordered="false">
-						<p>{{ t('git.publicKeys') }}: {{ config?.ssh.publicKeys.length ?? 0 }}</p>
-						<p>{{ t('git.agentKeys') }}: {{ config?.ssh.agentKeys.length ?? 0 }}</p>
-						<p v-for="key in config?.ssh.publicKeys" :key="key" class="muted-line">{{ key }}</p>
-						<p v-if="config?.ssh.error" class="muted-line">{{ config.ssh.error }}</p>
-					</a-card>
-					<a-card class="config-panel" :title="t('git.hooks')" :bordered="false">
-						<a-empty v-if="!hookRows.length" :description="t('git.noHooks')" />
-						<a-table v-else :data="hookRows" :pagination="false" :bordered="{ cell: true }" row-key="name">
-							<template #columns>
-								<a-table-column :title="t('common.name')" data-index="name" />
-								<a-table-column :title="t('git.executable')" data-index="executable" />
-							</template>
-						</a-table>
-					</a-card>
-					<a-card class="config-panel" title="Git LFS" :bordered="false">
-						<a-descriptions :column="1" bordered>
-							<a-descriptions-item label="LFS">{{ config?.lfs.available ? t('common.available') : t('common.unavailable') }}</a-descriptions-item>
-							<a-descriptions-item :label="t('common.version')">{{ config?.lfs.version || '-' }}</a-descriptions-item>
-							<a-descriptions-item :label="t('git.enabled')">{{ config?.lfs.enabled ? 'Yes' : 'No' }}</a-descriptions-item>
-						</a-descriptions>
-					</a-card>
-				</section>
+				<GitSystem :config="config" :hook-rows="hookRows" />
 			</a-collapse-item>
 		</a-collapse>
 	</main>
