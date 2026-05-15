@@ -8,6 +8,8 @@ import GitTemplates from '../components/git/GitTemplates.vue';
 import GitRemote from '../components/git/GitRemote.vue';
 import GitPolicy from '../components/git/GitPolicy.vue';
 import GitSystem from '../components/git/GitSystem.vue';
+import PageHeader from '../components/common/PageHeader.vue';
+import StatusAlerts from '../components/common/StatusAlerts.vue';
 
 interface GitMessage {
 	type: 'gitConfigUpdated' | 'gitConfigSaved';
@@ -194,17 +196,9 @@ onUnmounted(() => {
 
 <template>
 	<main class="page">
-		<header class="toolbar">
-			<div>
-				<h1>{{ t('git.title') }}</h1>
-				<p>{{ t('git.subtitle') }}</p>
-			</div>
-			<a-button type="primary" :loading="isLoading" @click="refreshGitConfig">{{ t('common.refresh') }}</a-button>
-		</header>
+		<PageHeader :title="t('git.title')" :subtitle="t('git.subtitle')" :action-label="t('common.refresh')" :loading="isLoading" @action="refreshGitConfig" />
 
-		<p v-if="workspacePath" class="muted-line">{{ t('git.currentProject') }}: {{ workspacePath }}</p>
-		<a-alert v-if="successMessage" type="success">{{ successMessage }}</a-alert>
-		<a-alert v-if="errorMessage" type="error">{{ errorMessage }}</a-alert>
+		<StatusAlerts :success-message="successMessage" :error-message="errorMessage" />
 
 		<a-collapse :default-active-key="[]">
 			<a-collapse-item key="overview" :header="t('git.sections.overview')">
