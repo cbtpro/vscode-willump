@@ -105,7 +105,7 @@ const portColumns = computed<Array<{ key: PortColumnKey; title: string; width?: 
 	{ key: 'listenAddress', title: t('ports.listenAddress'), width: 180 },
 	{ key: 'pid', title: t('ports.pid'), width: 120 },
 	{ key: 'command', title: t('ports.command') },
-	{ key: 'commandFull', title: t('ports.fullCommand'), width: 420 }
+	{ key: 'commandFull', title: t('ports.viewFullCommand'), width: 420 }
 ]);
 const processColumns = computed<Array<{ key: ProcessColumnKey; title: string; width?: number }>>(() => [
 	{ key: 'command', title: t('ports.command') },
@@ -351,6 +351,18 @@ function closeFullCommand() {
 	fullCommandText.value = '';
 }
 
+function copyFullCommand() {
+	try {
+		navigator.clipboard && navigator.clipboard.writeText(fullCommandText.value || '');
+		// give user feedback
+		successMessage.value = 'Copied to clipboard';
+		setTimeout(() => (successMessage.value = ''), 2000);
+	} catch (err) {
+		errorMessage.value = t('ports.loadFailed');
+		setTimeout(() => (errorMessage.value = ''), 2000);
+	}
+}
+
 function confirmKillPort() {
 	if (!pendingKill.value) {
 		return;
@@ -493,9 +505,14 @@ onUnmounted(() => {
 						</div>
 					</template>
 					<template #cell="{ record }">
-						<a-button type="text" status="danger" size="small" :disabled="isKilling" @click="openKillConfirm(record)">
-							{{ t('ports.kill') }}
-						</a-button>
+						<a-space>
+							<a-button v-if="record.commandFull && record.commandFull !== record.command" type="text" size="small" @click="openFullCommand(record.commandFull)">
+								{{ t('ports.view') }}
+							</a-button>
+							<a-button type="text" status="danger" size="small" :disabled="isKilling" @click="openKillConfirm(record)">
+								{{ t('ports.kill') }}
+							</a-button>
+						</a-space>
 					</template>
 				</a-table-column>
 			</template>
@@ -546,15 +563,20 @@ onUnmounted(() => {
 						</div>
 					</template>
 					<template #cell="{ record }">
-						<a-button
-							type="text"
-							status="danger"
-							size="small"
-							:disabled="isKilling || !isKillable(record.pid)"
-							@click="openProcessKillConfirm(record)"
-						>
-							{{ t('ports.kill') }}
-						</a-button>
+						<a-space>
+							<a-button v-if="record.commandFull && record.commandFull !== record.command" type="text" size="small" @click="openFullCommand(record.commandFull)">
+								{{ t('ports.view') }}
+							</a-button>
+							<a-button
+								type="text"
+								status="danger"
+								size="small"
+								:disabled="isKilling || !isKillable(record.pid)"
+								@click="openProcessKillConfirm(record)"
+							>
+								{{ t('ports.kill') }}
+							</a-button>
+						</a-space>
 					</template>
 				</a-table-column>
 			</template>
@@ -578,12 +600,26 @@ onUnmounted(() => {
 
 				<a-modal v-model:visible="isFullCommandVisible" :title="'Full Command'" :footer="false" :mask-closable="true">
 					<div class="full-command-modal">
-						<pre class="full-command-content">{{ fullCommandText }}</pre>
+							<pre class="full-command-content">{{ fullCommandText }}</pre>
 						<div class="dialog-actions">
 							<a-button @click="closeFullCommand">{{ t('common.close') }}</a-button>
-							<a-button type="primary" @click="() => { navigator.clipboard && navigator.clipboard.writeText(fullCommandText); }">Copy</a-button>
+							<a-button type="primary" @click="copyFullCommand">Copy</a-button>
 						</div>
 					</div>
 				</a-modal>
 	</main>
 </template>
+
+<style scoped>
+.full-command-content {
+	white-space: pre-wrap;
+	word-break: break-word;
+	overflow-x: auto;
+	max-height: 60vh;
+	display: block;
+}
+
+.table-action-header a-button {
+	margin-left: 4px;
+}
+</style>
