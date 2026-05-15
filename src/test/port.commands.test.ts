@@ -206,3 +206,6 @@ describe('Port Command Profile Test Suite', () => {
 		assert.deepStrictEqual(profile.parseListeningPids(stdout, '8080'), ['50324']);
 	});
 });
+
+}
+
