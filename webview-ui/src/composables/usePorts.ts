@@ -28,8 +28,13 @@ const successMessage = ref('');
 const pendingKill = ref<KillTarget | null>(null);
 const isFullCommandVisible = ref(false);
 const fullCommandText = ref('');
-const visibleColumnKeys = ref<PortColumnKey[]>(['port', 'type', 'localAddress', 'listenAddress', 'pid', 'command']);
-const visibleProcessColumnKeys = ref<ProcessColumnKey[]>(['command', 'pid', 'ports', 'protocols', 'connectionCount']);
+import useTableColumns from './useTableColumns';
+
+const tableColumns = useTableColumns<PortColumnKey>(['port', 'type', 'localAddress', 'listenAddress', 'pid', 'command']);
+const processTableColumns = useTableColumns<ProcessColumnKey>(['command', 'pid', 'ports', 'protocols', 'connectionCount']);
+
+const visibleColumnKeys = tableColumns.visibleKeys;
+const visibleProcessColumnKeys = processTableColumns.visibleKeys;
 const sortState = ref<{ key: PortColumnKey; direction: SortDirection }>({ key: 'port', direction: '' });
 const processSortState = ref<{ key: ProcessColumnKey; direction: SortDirection }>({ key: 'connectionCount', direction: 'desc' });
 
@@ -268,39 +273,14 @@ direction: processSortState.value.direction === 'asc' ? 'desc' : processSortStat
 }
 
 function toggleVisibleColumn(key: string, checked: string | number | boolean) {
-if (viewMode.value === 'processes') {
-toggleProcessColumnVisible(key as ProcessColumnKey, checked);
-return;
+  if (viewMode.value === 'processes') {
+    processTableColumns.toggleColumn(key as ProcessColumnKey, checked);
+    return;
+  }
+
+  tableColumns.toggleColumn(key as PortColumnKey, checked);
 }
 
-toggleColumnVisible(key as PortColumnKey, checked);
-}
-
-function toggleColumnVisible(key: PortColumnKey, checked: string | number | boolean) {
-if (checked) {
-visibleColumnKeys.value = Array.from(new Set([...visibleColumnKeys.value, key]));
-return;
-}
-
-if (visibleColumnKeys.value.length <= 1) {
-return;
-}
-
-visibleColumnKeys.value = visibleColumnKeys.value.filter(item => item !== key);
-}
-
-function toggleProcessColumnVisible(key: ProcessColumnKey, checked: string | number | boolean) {
-if (checked) {
-visibleProcessColumnKeys.value = Array.from(new Set([...visibleProcessColumnKeys.value, key]));
-return;
-}
-
-if (visibleProcessColumnKeys.value.length <= 1) {
-return;
-}
-
-visibleProcessColumnKeys.value = visibleProcessColumnKeys.value.filter(item => item !== key);
-}
 
 function openKillConfirm(item: KillTarget) {
 errorMessage.value = '';
