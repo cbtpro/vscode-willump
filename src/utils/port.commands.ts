@@ -493,8 +493,8 @@ export function describePort(port: string): string | undefined {
 		'5000': 'Flask/dev',
 		'5432': 'PostgreSQL',
 		'6379': 'Redis',
-		'8000': 'HTTP (alt)',
-		'8080': 'HTTP (alt)',
+		'8000': 'HTTP (alternate port: 8000)',
+		'8080': 'HTTP (alternate port: 8080)',
 		'9229': 'Node Inspector',
 		'10000': 'Webmin'
 	};
