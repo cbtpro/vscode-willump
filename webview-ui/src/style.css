@@ -217,7 +217,7 @@ p {
 .summary .arco-card-body {
 	display: grid;
 	align-items: center;
-	grid-template-columns: auto auto auto minmax(260px, 1fr);
+	grid-template-columns: auto auto auto auto minmax(260px, 1fr);
 	gap: 16px;
 	padding: 12px;
 }

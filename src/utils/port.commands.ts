@@ -23,12 +23,14 @@ export interface PortCommandProfile {
 	findListeningPids(port: string): CommandSpec;
 	getProcessName(pid: string): CommandSpec;
 	killPid(pid: string): CommandSpec;
+	listProcessNames?(): CommandSpec;
 	listAllPorts(): CommandSpec;
 	listListeningPorts(): CommandSpec;
 	parseAllPorts(stdout: string): PortInfo[];
 	parseListeningPids(stdout: string, port: string): string[];
 	parseListeningPorts(stdout: string): PortInfo[];
 	parseProcessName(stdout: string, pid: string): string | undefined;
+	parseProcessNameList?(stdout: string): Map<string, string>;
 	isEmptyListeningResult(error: { code?: number | string; stdout?: string }): boolean;
 }
 
@@ -50,6 +52,11 @@ const windowsProfile: PortCommandProfile = {
 		type: 'file',
 		file: 'taskkill',
 		args: ['/PID', pid, '/F']
+	}),
+	listProcessNames: () => ({
+		type: 'file',
+		file: 'tasklist',
+		args: ['/FO', 'CSV', '/NH']
 	}),
 	listAllPorts: () => ({
 		type: 'shell',
@@ -102,6 +109,7 @@ const windowsProfile: PortCommandProfile = {
 
 		return firstColumn && !firstColumn.startsWith('INFO:') ? firstColumn : undefined;
 	},
+	parseProcessNameList: stdout => parseWindowsTaskList(stdout),
 	isEmptyListeningResult: () => false
 };
 
@@ -252,6 +260,20 @@ function parseCsvLine(line: string): string[] {
 
 	values.push(current);
 	return values;
+}
+
+function parseWindowsTaskList(stdout: string): Map<string, string> {
+	const namesByPid = new Map<string, string>();
+
+	for (const line of stdout.trim().split(/\r?\n/)) {
+		const [name, pid] = parseCsvLine(line);
+
+		if (name && /^\d+$/.test(pid)) {
+			namesByPid.set(pid, name);
+		}
+	}
+
+	return namesByPid;
 }
 
 function parsePosixLsofLine(line: string): PortInfo | undefined {

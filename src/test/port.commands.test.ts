@@ -53,6 +53,11 @@ suite('Port Command Profile Test Suite', () => {
 			file: 'taskkill',
 			args: ['/PID', '12345', '/F']
 		});
+		assert.deepStrictEqual(profile.listProcessNames?.(), {
+			type: 'file',
+			file: 'tasklist',
+			args: ['/FO', 'CSV', '/NH']
+		});
 		assert.deepStrictEqual(profile.listListeningPorts(), {
 			type: 'shell',
 			command: 'netstat -ano'
@@ -171,6 +176,19 @@ suite('Port Command Profile Test Suite', () => {
 			'com.docker.backend.exe'
 		);
 		assert.strictEqual(profile.parseProcessName('INFO: No tasks are running which match the specified criteria.\r\n', '12345'), undefined);
+	});
+
+	test('parses Windows tasklist output into a PID process name map', () => {
+		const profile = getPortCommandProfile('win32');
+		const processNames = profile.parseProcessNameList?.([
+			'"node.exe","1852","Console","1","22,948 K"',
+			'"Code.exe","42988","Console","1","165,448 K"',
+			'"Next AI Draw.io.exe","55364","Console","1","39,376 K"'
+		].join('\r\n'));
+
+		assert.strictEqual(processNames?.get('1852'), 'node.exe');
+		assert.strictEqual(processNames?.get('42988'), 'Code.exe');
+		assert.strictEqual(processNames?.get('55364'), 'Next AI Draw.io.exe');
 	});
 
 	test('parses Windows listening pids by exact local port', () => {

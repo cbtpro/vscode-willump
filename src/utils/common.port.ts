@@ -151,8 +151,27 @@ async function enrichProcessNames(ports: PortInfo[], profile = getPortCommandPro
 	const namesByPid = new Map<string, string>();
 	const pids = Array.from(new Set(ports.map(item => item.pid).filter(pid => /^\d+$/.test(pid))));
 
+	if (profile.listProcessNames && profile.parseProcessNameList && pids.length) {
+		try {
+			const { stdout } = await executeCommand(profile.listProcessNames(), { maxBuffer: 1024 * 1024 * 4, timeout: 5000 });
+			const processNames = profile.parseProcessNameList(stdout);
+
+			for (const pid of pids) {
+				const name = processNames.get(pid);
+
+				if (name) {
+					namesByPid.set(pid, name);
+				}
+			}
+		} catch (err) {
+			// Fall back to per-process lookup below when bulk process listing is unavailable.
+		}
+	}
+
+	const missingPids = pids.filter(pid => !namesByPid.has(pid));
+
 	await Promise.all(
-		pids.map(async pid => {
+		missingPids.map(async pid => {
 			try {
 				const { stdout } = await executeCommand(profile.getProcessName(pid), { maxBuffer: 1024 * 64, timeout: 2500 });
 				const name = profile.parseProcessName(stdout, pid);
