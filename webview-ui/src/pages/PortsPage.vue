@@ -1,11 +1,22 @@
 <script setup lang="ts">
-import IconCheck from '@arco-design/web-vue/es/icon/icon-check';
-import IconCopy from '@arco-design/web-vue/es/icon/icon-copy';
-import IconSettings from '@arco-design/web-vue/es/icon/icon-settings';
-import IconSort from '@arco-design/web-vue/es/icon/icon-sort';
-import IconSortAscending from '@arco-design/web-vue/es/icon/icon-sort-ascending';
-import IconSortDescending from '@arco-design/web-vue/es/icon/icon-sort-descending';
 import { computed, onMounted, onUnmounted, ref } from 'vue';
+import PageHeader from '../components/common/PageHeader.vue';
+import StatusAlerts from '../components/common/StatusAlerts.vue';
+import FullCommandModal from '../components/ports/FullCommandModal.vue';
+import PortKillConfirmModal from '../components/ports/PortKillConfirmModal.vue';
+import PortsSummaryBar from '../components/ports/PortsSummaryBar.vue';
+import PortsTable from '../components/ports/PortsTable.vue';
+import type {
+	KillTarget,
+	NetworkProcessRow,
+	PortColumnKey,
+	PortConnectionRow,
+	PortTableColumn,
+	PortTableRow,
+	PortViewMode,
+	ProcessColumnKey,
+	SortDirection
+} from '../components/ports/ports.types';
 import { t } from '../i18n';
 import { getVsCodeApi, type PortInfo, type PortScanMode } from '../vscode';
 
@@ -17,29 +28,6 @@ interface WebviewMessage {
 	port?: string;
 	pid?: string;
 	message?: string;
-}
-
-type PortColumnKey = 'port' | 'type' | 'localAddress' | 'listenAddress' | 'pid' | 'command' | 'processPath' | 'commandFull';
-type ProcessColumnKey = 'command' | 'pid' | 'ports' | 'protocols' | 'connectionCount' | 'processPath' | 'commandFull';
-type SortDirection = 'asc' | 'desc' | '';
-type PortViewMode = 'connections' | 'processes';
-type CopyState = 'idle' | 'success' | 'error';
-
-interface KillTarget {
-	port: string;
-	pid: string;
-	command: string;
-}
-
-interface NetworkProcessRow {
-	rowId: string;
-	pid: string;
-	command: string;
-	ports: string;
-	protocols: string;
-	connectionCount: number;
-	processPath: string;
-	commandFull: string;
 }
 
 const vscode = getVsCodeApi();
@@ -56,8 +44,6 @@ const successMessage = ref('');
 const pendingKill = ref<KillTarget | null>(null);
 const isFullCommandVisible = ref(false);
 const fullCommandText = ref('');
-const isCopyingFullCommand = ref(false);
-const fullCommandCopyState = ref<CopyState>('idle');
 const visibleColumnKeys = ref<PortColumnKey[]>(['port', 'type', 'localAddress', 'listenAddress', 'pid', 'command']);
 const visibleProcessColumnKeys = ref<ProcessColumnKey[]>(['command', 'pid', 'ports', 'protocols', 'connectionCount']);
 const sortState = ref<{ key: PortColumnKey; direction: SortDirection }>({
@@ -68,7 +54,7 @@ const processSortState = ref<{ key: ProcessColumnKey; direction: SortDirection }
 	key: 'connectionCount',
 	direction: 'desc'
 });
-let fullCommandCopyResetTimer: ReturnType<typeof setTimeout> | undefined;
+
 const isKillConfirmVisible = computed({
 	get: () => Boolean(pendingKill.value),
 	set: visible => {
@@ -77,7 +63,6 @@ const isKillConfirmVisible = computed({
 		}
 	}
 });
-
 const filteredPorts = computed(() => {
 	const value = keyword.value.trim().toLowerCase();
 
@@ -91,7 +76,6 @@ const filteredPorts = computed(() => {
 		)
 	);
 });
-
 const hasKeyword = computed(() => keyword.value.trim().length > 0);
 const processRows = computed(() => aggregateNetworkProcesses(ports.value));
 const filteredProcessRows = computed(() => {
@@ -110,29 +94,7 @@ const filteredProcessRows = computed(() => {
 const totalCountLabel = computed(() => (viewMode.value === 'processes' ? t('ports.processCount') : t('ports.occupiedCount')));
 const totalCount = computed(() => (viewMode.value === 'processes' ? processRows.value.length : ports.value.length));
 const filteredCount = computed(() => (viewMode.value === 'processes' ? filteredProcessRows.value.length : filteredPorts.value.length));
-const fullCommandCopyFeedback = computed(() => {
-	if (fullCommandCopyState.value === 'success') {
-		return { type: 'success' as const, content: t('ports.copySuccess') };
-	}
-
-	if (fullCommandCopyState.value === 'error') {
-		return { type: 'error' as const, content: t('ports.copyFailed') };
-	}
-
-	return null;
-});
-const fullCommandCopyButtonText = computed(() => {
-	if (isCopyingFullCommand.value) {
-		return t('ports.copying');
-	}
-
-	if (fullCommandCopyState.value === 'success') {
-		return t('ports.copied');
-	}
-
-	return t('common.copy');
-});
-const portColumns = computed<Array<{ key: PortColumnKey; title: string; width?: number }>>(() => [
+const portColumns = computed<Array<PortTableColumn & { key: PortColumnKey }>>(() => [
 	{ key: 'port', title: t('ports.port'), width: 110 },
 	{ key: 'type', title: t('ports.type'), width: 160 },
 	{ key: 'localAddress', title: t('ports.localAddress'), width: 220 },
@@ -142,7 +104,7 @@ const portColumns = computed<Array<{ key: PortColumnKey; title: string; width?: 
 	{ key: 'processPath', title: t('ports.processPath'), width: 260 },
 	{ key: 'commandFull', title: t('ports.startCommand'), width: 420 }
 ]);
-const processColumns = computed<Array<{ key: ProcessColumnKey; title: string; width?: number }>>(() => [
+const processColumns = computed<Array<PortTableColumn & { key: ProcessColumnKey }>>(() => [
 	{ key: 'command', title: t('ports.command') },
 	{ key: 'pid', title: t('ports.pid'), width: 120 },
 	{ key: 'ports', title: t('ports.ports'), width: 220 },
@@ -151,15 +113,20 @@ const processColumns = computed<Array<{ key: ProcessColumnKey; title: string; wi
 	{ key: 'processPath', title: t('ports.processPath'), width: 260 },
 	{ key: 'commandFull', title: t('ports.startCommand'), width: 420 }
 ]);
-const visiblePortColumns = computed(() => portColumns.value.filter(column => isColumnVisible(column.key)));
-const visibleProcessColumns = computed(() => processColumns.value.filter(column => isProcessColumnVisible(column.key)));
-const tableRows = computed(() =>
+const visiblePortColumns = computed(() => portColumns.value.filter(column => visibleColumnKeys.value.includes(column.key)));
+const visibleProcessColumns = computed(() => processColumns.value.filter(column => visibleProcessColumnKeys.value.includes(column.key)));
+const tableRows = computed<PortConnectionRow[]>(() =>
 	sortPorts(filteredPorts.value).map(item => ({
 		...item,
 		rowId: `${item.type}-${item.localAddress}-${item.port}-${item.pid}-${item.command}`
 	}))
 );
 const processTableRows = computed(() => sortProcessRows(filteredProcessRows.value));
+const activeRows = computed<PortTableRow[]>(() => (viewMode.value === 'processes' ? processTableRows.value : tableRows.value));
+const activeColumns = computed(() => (viewMode.value === 'processes' ? visibleProcessColumns.value : visiblePortColumns.value));
+const activeAllColumns = computed(() => (viewMode.value === 'processes' ? processColumns.value : portColumns.value));
+const activeSortKey = computed(() => (viewMode.value === 'processes' ? processSortState.value.key : sortState.value.key));
+const activeSortDirection = computed(() => (viewMode.value === 'processes' ? processSortState.value.direction : sortState.value.direction));
 
 function sortPorts(items: PortInfo[]) {
 	if (!sortState.value.direction) {
@@ -167,7 +134,7 @@ function sortPorts(items: PortInfo[]) {
 	}
 
 	return [...items].sort((left, right) => {
-		const result = compareColumnValue(left[sortState.value.key], right[sortState.value.key], sortState.value.key);
+		const result = compareColumnValue(left[sortState.value.key] ?? '', right[sortState.value.key] ?? '', sortState.value.key);
 		return sortState.value.direction === 'asc' ? result : -result;
 	});
 }
@@ -288,7 +255,16 @@ function handleViewModeChange(value: string | number | boolean) {
 	}
 }
 
-function toggleSort(key: PortColumnKey) {
+function toggleSort(key: string) {
+	if (viewMode.value === 'processes') {
+		toggleProcessSort(key as ProcessColumnKey);
+		return;
+	}
+
+	togglePortSort(key as PortColumnKey);
+}
+
+function togglePortSort(key: PortColumnKey) {
 	if (sortState.value.key !== key) {
 		sortState.value = { key, direction: 'asc' };
 		return;
@@ -312,28 +288,13 @@ function toggleProcessSort(key: ProcessColumnKey) {
 	};
 }
 
-function getSortIcon(key: PortColumnKey) {
-	if (sortState.value.key !== key || !sortState.value.direction) {
-		return IconSort;
+function toggleVisibleColumn(key: string, checked: string | number | boolean) {
+	if (viewMode.value === 'processes') {
+		toggleProcessColumnVisible(key as ProcessColumnKey, checked);
+		return;
 	}
 
-	return sortState.value.direction === 'asc' ? IconSortAscending : IconSortDescending;
-}
-
-function getProcessSortIcon(key: ProcessColumnKey) {
-	if (processSortState.value.key !== key || !processSortState.value.direction) {
-		return IconSort;
-	}
-
-	return processSortState.value.direction === 'asc' ? IconSortAscending : IconSortDescending;
-}
-
-function isColumnVisible(key: PortColumnKey) {
-	return visibleColumnKeys.value.includes(key);
-}
-
-function isProcessColumnVisible(key: ProcessColumnKey) {
-	return visibleProcessColumnKeys.value.includes(key);
+	toggleColumnVisible(key as PortColumnKey, checked);
 }
 
 function toggleColumnVisible(key: PortColumnKey, checked: string | number | boolean) {
@@ -368,11 +329,11 @@ function openKillConfirm(item: KillTarget) {
 	pendingKill.value = item;
 }
 
-function openProcessKillConfirm(item: NetworkProcessRow) {
+function handleKill(record: PortTableRow) {
 	openKillConfirm({
-		port: item.ports || '-',
-		pid: item.pid,
-		command: item.command
+		port: 'ports' in record ? record.ports || '-' : record.port,
+		pid: record.pid,
+		command: record.command
 	});
 }
 
@@ -384,64 +345,15 @@ function closeKillConfirm() {
 	pendingKill.value = null;
 }
 
-function clearFullCommandCopyFeedback() {
-	if (fullCommandCopyResetTimer) {
-		clearTimeout(fullCommandCopyResetTimer);
-		fullCommandCopyResetTimer = undefined;
-	}
-
-	isCopyingFullCommand.value = false;
-	fullCommandCopyState.value = 'idle';
-}
-
-function scheduleFullCommandCopyFeedbackReset() {
-	if (fullCommandCopyResetTimer) {
-		clearTimeout(fullCommandCopyResetTimer);
-	}
-
-	fullCommandCopyResetTimer = setTimeout(() => {
-		fullCommandCopyState.value = 'idle';
-		fullCommandCopyResetTimer = undefined;
-	}, 2000);
-}
-
 function openFullCommand(command?: string) {
-	clearFullCommandCopyFeedback();
 	fullCommandText.value = command ?? '';
 	isFullCommandVisible.value = true;
 }
 
-function closeFullCommand() {
-	isFullCommandVisible.value = false;
-	fullCommandText.value = '';
-	clearFullCommandCopyFeedback();
-}
-
-async function copyFullCommand() {
-	if (isCopyingFullCommand.value) {
-		return;
-	}
-
-	if (fullCommandCopyResetTimer) {
-		clearTimeout(fullCommandCopyResetTimer);
-		fullCommandCopyResetTimer = undefined;
-	}
-
-	isCopyingFullCommand.value = true;
-	fullCommandCopyState.value = 'idle';
-
-	try {
-		if (!navigator.clipboard?.writeText) {
-			throw new Error('Clipboard API is not available');
-		}
-
-		await navigator.clipboard.writeText(fullCommandText.value || '');
-		fullCommandCopyState.value = 'success';
-	} catch (err) {
-		fullCommandCopyState.value = 'error';
-	} finally {
-		isCopyingFullCommand.value = false;
-		scheduleFullCommandCopyFeedbackReset();
+function handleFullCommandVisibleChange(visible: boolean) {
+	isFullCommandVisible.value = visible;
+	if (!visible) {
+		fullCommandText.value = '';
 	}
 }
 
@@ -459,10 +371,6 @@ function confirmKillPort() {
 		pid: pendingKill.value.pid,
 		mode: scanMode.value
 	});
-}
-
-function isKillable(pid: string) {
-	return /^\d+$/.test(pid);
 }
 
 function handleMessage(event: MessageEvent<WebviewMessage>) {
@@ -509,224 +417,43 @@ onMounted(() => {
 
 onUnmounted(() => {
 	window.removeEventListener('message', handleMessage);
-	clearFullCommandCopyFeedback();
 });
 </script>
 
 <template>
 	<main class="page">
-		<header class="toolbar">
-			<div>
-				<h1>{{ t('ports.title') }}</h1>
-				<p>{{ t('ports.subtitle') }}</p>
-			</div>
-			<a-button type="primary" :loading="isRefreshing" @click="refreshPorts">{{ t('common.refresh') }}</a-button>
-		</header>
+		<PageHeader :title="t('ports.title')" :subtitle="t('ports.subtitle')" :action-label="t('common.refresh')" :loading="isRefreshing" @action="refreshPorts" />
 
-		<a-card class="summary" :bordered="false">
-			<div>
-				<span class="summary-label">{{ totalCountLabel }}</span>
-				<strong>{{ totalCount }}</strong>
-			</div>
-			<div>
-				<span class="summary-label">{{ t('ports.filterCount') }}</span>
-				<strong>{{ filteredCount }}</strong>
-			</div>
-			<a-radio-group :model-value="scanMode" type="button" @change="handleScanModeChange">
-				<a-radio value="listening">{{ t('ports.listening') }}</a-radio>
-				<a-radio value="all">{{ t('ports.allConnections') }}</a-radio>
-			</a-radio-group>
-			<a-radio-group :model-value="viewMode" type="button" @change="handleViewModeChange">
-				<a-radio value="connections">{{ t('ports.connectionDetails') }}</a-radio>
-				<a-radio value="processes">{{ t('ports.processAggregation') }}</a-radio>
-			</a-radio-group>
-			<a-input-search v-model="keyword" class="search" allow-clear :placeholder="t('ports.searchPlaceholder')" />
-		</a-card>
+		<PortsSummaryBar
+			v-model:keyword="keyword"
+			:total-count-label="totalCountLabel"
+			:total-count="totalCount"
+			:filtered-count="filteredCount"
+			:scan-mode="scanMode"
+			:view-mode="viewMode"
+			@change-scan-mode="handleScanModeChange"
+			@change-view-mode="handleViewModeChange"
+		/>
 
-		<a-alert v-if="successMessage" type="success">{{ successMessage }}</a-alert>
-		<a-alert v-if="errorMessage" type="error">{{ errorMessage }}</a-alert>
+		<StatusAlerts :success-message="successMessage" :error-message="errorMessage" />
 
-		<a-table
-			v-if="viewMode === 'connections'"
-			:data="tableRows"
+		<PortsTable
+			:mode="viewMode"
+			:rows="activeRows"
+			:columns="activeColumns"
+			:all-columns="activeAllColumns"
+			:sort-key="activeSortKey"
+			:sort-direction="activeSortDirection"
 			:loading="isRefreshing"
-			:pagination="false"
-			:bordered="{ cell: true }"
-			:scroll="{ x: 1240 }"
-			row-key="rowId"
-		>
-			<template #columns>
-				<a-table-column v-for="column in visiblePortColumns" :key="column.key" :data-index="column.key" :width="column.width">
-					<template #title>
-						<button class="table-header-button" type="button" @click="toggleSort(column.key)">
-							<span>{{ column.title }}</span>
-							<component :is="getSortIcon(column.key)" />
-						</button>
-					</template>
-				</a-table-column>
-				<a-table-column :width="120" align="right">
-					<template #title>
-						<div class="table-action-header">
-							<span>{{ t('ports.action') }}</span>
-							<a-dropdown trigger="click" position="br">
-								<a-button type="text" size="small" :title="t('ports.columnSettings')">
-									<IconSettings />
-								</a-button>
-								<template #content>
-									<div class="column-menu">
-										<a-checkbox
-											v-for="column in portColumns"
-											:key="column.key"
-											:model-value="isColumnVisible(column.key)"
-											@change="checked => toggleColumnVisible(column.key, checked)"
-										>
-											{{ column.title }}
-										</a-checkbox>
-									</div>
-								</template>
-							</a-dropdown>
-						</div>
-					</template>
-					<template #cell="{ record }">
-						<a-space>
-							<a-button v-if="record.commandFull" type="text" size="small" @click="openFullCommand(record.commandFull)">
-								{{ t('ports.view') }}
-							</a-button>
-							<a-button type="text" status="danger" size="small" :disabled="isKilling" @click="openKillConfirm(record)">
-								{{ t('ports.kill') }}
-							</a-button>
-						</a-space>
-					</template>
-				</a-table-column>
-			</template>
-			<template #empty>
-				<a-empty :description="hasKeyword ? t('ports.noMatch') : t('ports.empty')" />
-			</template>
-		</a-table>
+			:has-keyword="hasKeyword"
+			:is-killing="isKilling"
+			@toggle-sort="toggleSort"
+			@toggle-column="toggleVisibleColumn"
+			@view-command="openFullCommand"
+			@kill="handleKill"
+		/>
 
-		<a-table
-			v-else
-			:data="processTableRows"
-			:loading="isRefreshing"
-			:pagination="false"
-			:bordered="{ cell: true }"
-			:scroll="{ x: 1240 }"
-			row-key="rowId"
-		>
-			<template #columns>
-				<a-table-column v-for="column in visibleProcessColumns" :key="column.key" :data-index="column.key" :width="column.width">
-					<template #title>
-						<button class="table-header-button" type="button" @click="toggleProcessSort(column.key)">
-							<span>{{ column.title }}</span>
-							<component :is="getProcessSortIcon(column.key)" />
-						</button>
-					</template>
-				</a-table-column>
-				<a-table-column :width="120" align="right">
-					<template #title>
-						<div class="table-action-header">
-							<span>{{ t('ports.action') }}</span>
-							<a-dropdown trigger="click" position="br">
-								<a-button type="text" size="small" :title="t('ports.columnSettings')">
-									<IconSettings />
-								</a-button>
-								<template #content>
-									<div class="column-menu">
-										<a-checkbox
-											v-for="column in processColumns"
-											:key="column.key"
-											:model-value="isProcessColumnVisible(column.key)"
-											@change="checked => toggleProcessColumnVisible(column.key, checked)"
-										>
-											{{ column.title }}
-										</a-checkbox>
-									</div>
-								</template>
-							</a-dropdown>
-						</div>
-					</template>
-					<template #cell="{ record }">
-						<a-space>
-							<a-button v-if="record.commandFull" type="text" size="small" @click="openFullCommand(record.commandFull)">
-								{{ t('ports.view') }}
-							</a-button>
-							<a-button
-								type="text"
-								status="danger"
-								size="small"
-								:disabled="isKilling || !isKillable(record.pid)"
-								@click="openProcessKillConfirm(record)"
-							>
-								{{ t('ports.kill') }}
-							</a-button>
-						</a-space>
-					</template>
-				</a-table-column>
-			</template>
-			<template #empty>
-				<a-empty :description="hasKeyword ? t('ports.noMatch') : t('ports.noProcessData')" />
-			</template>
-		</a-table>
-
-		<a-modal v-model:visible="isKillConfirmVisible" :title="t('ports.confirmKillTitle')" :footer="false" :mask-closable="!isKilling">
-			<p>{{ t('ports.confirmKillDescription') }}</p>
-			<a-descriptions v-if="pendingKill" class="process-detail" :column="1" bordered>
-				<a-descriptions-item :label="t('ports.port')">{{ pendingKill.port }}</a-descriptions-item>
-				<a-descriptions-item :label="t('ports.pid')">{{ pendingKill.pid }}</a-descriptions-item>
-				<a-descriptions-item :label="t('ports.command')">{{ pendingKill.command }}</a-descriptions-item>
-			</a-descriptions>
-			<div class="dialog-actions">
-				<a-button :disabled="isKilling" @click="closeKillConfirm">{{ t('common.cancel') }}</a-button>
-				<a-button type="primary" status="danger" :loading="isKilling" @click="confirmKillPort">{{ t('ports.confirmKill') }}</a-button>
-			</div>
-		</a-modal>
-
-		<a-modal v-model:visible="isFullCommandVisible" :title="t('ports.startCommand')" :footer="false" :mask-closable="!isCopyingFullCommand">
-			<div class="full-command-modal">
-				<pre class="full-command-content">{{ fullCommandText }}</pre>
-				<a-alert v-if="fullCommandCopyFeedback" class="full-command-feedback" :type="fullCommandCopyFeedback.type">
-					{{ fullCommandCopyFeedback.content }}
-				</a-alert>
-				<div class="dialog-actions">
-					<a-button :disabled="isCopyingFullCommand" @click="closeFullCommand">{{ t('common.close') }}</a-button>
-					<a-button type="primary" :status="fullCommandCopyState === 'success' ? 'success' : 'normal'" :loading="isCopyingFullCommand" @click="copyFullCommand">
-						<template #icon>
-							<IconCheck v-if="fullCommandCopyState === 'success'" />
-							<IconCopy v-else />
-						</template>
-						{{ fullCommandCopyButtonText }}
-					</a-button>
-				</div>
-			</div>
-		</a-modal>
+		<PortKillConfirmModal v-model:visible="isKillConfirmVisible" :target="pendingKill" :is-killing="isKilling" @confirm="confirmKillPort" />
+		<FullCommandModal :visible="isFullCommandVisible" :command="fullCommandText" @update:visible="handleFullCommandVisibleChange" />
 	</main>
 </template>
-
-<style scoped>
-.full-command-modal {
-	display: grid;
-	gap: 12px;
-}
-
-.full-command-content {
-	white-space: pre-wrap;
-	word-break: break-word;
-	overflow-x: auto;
-	max-height: 60vh;
-	display: block;
-	margin: 0;
-	padding: 12px;
-	border: 1px solid var(--color-border-2);
-	border-radius: 6px;
-	background: var(--color-fill-2);
-	color: var(--color-text-1);
-}
-
-.full-command-feedback {
-	margin: 0;
-}
-
-.table-action-header a-button {
-	margin-left: 4px;
-}
-</style>
