@@ -187,11 +187,16 @@ async function enrichProcessNames(ports: PortInfo[], profile = getPortCommandPro
 	return ports.map(item => {
 		const pidName = namesByPid.get(item.pid) ?? item.command;
 		const service = describePort(item.port);
-		const command = service ? `${pidName} (${service})` : pidName;
+		const commandFull = service ? `${pidName} (${service})` : pidName;
+		// derive short display name from the command (basename of the executable)
+		const firstToken = pidName.trim().split(/\s+/)[0] ?? '';
+		const executablePath = firstToken.match(/^"([^"]+)"/)?.[1] ?? firstToken;
+		const short = executablePath.split(/[\\\/]/).filter(Boolean).pop() ?? executablePath;		const commandShort = service ? `${short} (${service})` : short;
 
 		return {
 			...item,
-			command,
+			command: commandShort,
+			commandFull,
 			service
 		};
 	});

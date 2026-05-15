@@ -17,7 +17,7 @@ interface WebviewMessage {
 	message?: string;
 }
 
-type PortColumnKey = 'port' | 'type' | 'localAddress' | 'listenAddress' | 'pid' | 'command';
+type PortColumnKey = 'port' | 'type' | 'localAddress' | 'listenAddress' | 'pid' | 'command' | 'commandFull';
 type ProcessColumnKey = 'command' | 'pid' | 'ports' | 'protocols' | 'connectionCount';
 type SortDirection = 'asc' | 'desc' | '';
 type PortViewMode = 'connections' | 'processes';
@@ -102,7 +102,8 @@ const portColumns = computed<Array<{ key: PortColumnKey; title: string; width?: 
 	{ key: 'localAddress', title: t('ports.localAddress'), width: 220 },
 	{ key: 'listenAddress', title: t('ports.listenAddress'), width: 180 },
 	{ key: 'pid', title: t('ports.pid'), width: 120 },
-	{ key: 'command', title: t('ports.command') }
+	{ key: 'command', title: t('ports.command') },
+	{ key: 'commandFull', title: t('ports.fullCommand'), width: 420 }
 ]);
 const processColumns = computed<Array<{ key: ProcessColumnKey; title: string; width?: number }>>(() => [
 	{ key: 'command', title: t('ports.command') },
