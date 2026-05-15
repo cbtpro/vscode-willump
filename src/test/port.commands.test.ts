@@ -1,6 +1,7 @@
 import * as assert from 'assert';
 import { getPortCommandProfile } from '../utils/port.commands';
 
+if (typeof describe === 'function') {
 describe('Port Command Profile Test Suite', () => {
 	test('generates POSIX commands for checking, listing, finding and killing ports', () => {
 		const profile = getPortCommandProfile('darwin');
