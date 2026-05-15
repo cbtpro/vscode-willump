@@ -1,5 +1,7 @@
 # Willump
 
+[![CI](https://github.com/cbtpro/vscode-willump/actions/workflows/ci.yml/badge.svg)](https://github.com/cbtpro/vscode-willump/actions/workflows/ci.yml)
+
 Willump 是一个面向 VS Code 的本地端口管理扩展，主要用于帮助开发者快速排查端口占用、查看本机端口列表，并在需要时终止占用指定端口的进程。
 
 在前端、本地服务、微服务调试或多项目并行开发时，端口冲突是非常常见的问题。Willump 将常用的 `lsof`、`netstat`、`kill`、`taskkill` 等操作封装为 VS Code 命令，让开发者可以直接在编辑器内完成端口诊断和处理，减少在终端与编辑器之间来回切换的成本。
