@@ -5,6 +5,7 @@ export interface PortInfo {
 	type: string;
 	localAddress: string;
 	listenAddress: string;
+	service?: string;
 }
 
 export type PortScanMode = 'listening' | 'all';
@@ -339,8 +340,50 @@ function uniquePorts(ports: PortInfo[]): PortInfo[] {
 		if (seen.has(key)) {
 			return false;
 		}
-
-		seen.add(key);
+		seen.add(key);
 		return true;
 	});
+}
+
+export function describePort(port: string): string | undefined {
+	const known: Record<string, string> = {
+		'20': 'FTP (data)',
+		'21': 'FTP (control)',
+		'22': 'SSH',
+		'23': 'Telnet',
+		'25': 'SMTP',
+		'53': 'DNS',
+		'67': 'DHCP',
+		'68': 'DHCP',
+		'80': 'HTTP',
+		'110': 'POP3',
+		'123': 'NTP',
+		'143': 'IMAP',
+		'161': 'SNMP',
+		'194': 'IRC',
+		'443': 'HTTPS',
+		'587': 'SMTP (submission)',
+		'631': 'IPP',
+		'993': 'IMAPS',
+		'995': 'POP3S',
+		'1433': 'MSSQL',
+		'1521': 'Oracle DB',
+		'2049': 'NFS',
+		'2375': 'Docker (unsecure)',
+		'27017': 'MongoDB',
+		'3000': 'Node.js (dev)',
+		'3306': 'MySQL',
+		'3389': 'RDP',
+		'35729': 'LiveReload',
+		'4200': 'Angular (dev)',
+		'5000': 'Flask/dev',
+		'5432': 'PostgreSQL',
+		'6379': 'Redis',
+		'8000': 'HTTP (alt)',
+		'8080': 'HTTP (alt)',
+		'9229': 'Node Inspector',
+		'10000': 'Webmin'
+	};
+
+	return known[port];
 }

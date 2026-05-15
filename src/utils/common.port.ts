@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import * as childProcess from 'child_process';
 import { promisify } from 'util';
 import { localize } from '../i18n';
-import { CommandSpec, getPortCommandProfile, PortInfo, PortScanMode } from './port.commands';
+import { CommandSpec, getPortCommandProfile, PortInfo, PortScanMode, describePort } from './port.commands';
 
 /**
  * 检查指定端口的使用情况。
@@ -175,8 +175,7 @@ async function enrichProcessNames(ports: PortInfo[], profile = getPortCommandPro
 			try {
 				const { stdout } = await executeCommand(profile.getProcessName(pid), { maxBuffer: 1024 * 64, timeout: 2500 });
 				const name = profile.parseProcessName(stdout, pid);
-
-				if (name) {
+				if (name) {
 					namesByPid.set(pid, name);
 				}
 			} catch (err) {
@@ -185,10 +184,17 @@ async function enrichProcessNames(ports: PortInfo[], profile = getPortCommandPro
 		})
 	);
 
-	return ports.map(item => ({
-		...item,
-		command: namesByPid.get(item.pid) ?? item.command
-	}));
+	return ports.map(item => {
+		const pidName = namesByPid.get(item.pid) ?? item.command;
+		const service = describePort(item.port);
+		const command = service ? `${pidName} (${service})` : pidName;
+
+		return {
+			...item,
+			command,
+			service
+		};
+	});
 }
 
 async function getListeningPidsByPort(port: string): Promise<string[]> {

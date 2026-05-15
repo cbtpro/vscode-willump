@@ -5,6 +5,7 @@ export interface PortInfo {
 	type: string;
 	localAddress: string;
 	listenAddress: string;
+	service?: string;
 }
 
 export type PortScanMode = 'listening' | 'all';
