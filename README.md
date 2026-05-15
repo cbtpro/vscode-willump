@@ -37,6 +37,58 @@ npm run compile
 npm run package
 ```
 
+开发指南
+
+### 环境要求
+
+- Node.js 18+（推荐 20.x）
+- VS Code（用于本地调试 Extension Development Host）
+- npm 用于安装依赖与执行脚本
+
+### 本地开发流程
+
+1. 安装依赖：
+
+```bash
+npm install
+```
+
+2. 编译源码：
+
+```bash
+npm run compile
+```
+
+3. 启动开发宿主：在 VS Code 中按 F5（Run Extension）启动 Extension Development Host，并在新窗口命令面板中运行 "Willump: 查看端口占用" 进行验证。
+
+4. 监听开发：
+
+```bash
+npm run watch
+npm run watch:webview
+```
+
+修改后在 Extension Development Host 中执行 `Developer: Reload Window` 以应用更改。
+
+### 调试要点
+
+- 在 `src/extension.ts` 或 `src/utils/common.port.ts` 中设置断点来调试扩展侧逻辑。
+- Webview 源码位于 `webview-ui/src/`，可在浏览器控制台查看 Webview 日志（通过 `acquireVsCodeApi().postMessage`/`onmessage` 通信）。
+- 涉及系统命令的解析代码应被抽象成可测试的解析器，便于在无权限环境下通过 mock 进行单元测试。
+
+### 新命令开发流程
+
+1. 在 `src/constants/port.ts` 中增加命令 ID。
+2. 在 `package.json` 的 `contributes.commands` 中声明命令。
+3. 在 `src/extension.ts` 的 `activate` 中注册命令并调用实现。
+4. 将具体逻辑放在 `src/utils/` 中编写，保持入口文件轻量。
+
+### 端口功能开发约定
+
+- 平台相关命令与解析应分离（例如 `port.commands.ts`），便于扩展与测试。
+- 对系统命令输出做结构化解析，并对权限不足或输出格式异常场景做好降级处理。
+- 终止进程前务必提供确认弹窗并展示 PID、命令与受影响端口。
+
 Webview 使用说明
 
 - 页面由 Vue 3 + Vite 构建，默认展示短命令（表格），并在需要时通过“查看”弹窗显示完整命令与复制功能。
