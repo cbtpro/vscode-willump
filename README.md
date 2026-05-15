@@ -1,6 +1,6 @@
 # Willump
 
-[![CI](https://github.com/cbtpro/vscode-willump/actions/workflows/ci.yml/badge.svg)](https://github.com/cbtpro/vscode-willump/actions/workflows/ci.yml)
+[![CI](https://github.com/cbtpro/vscode-willump/actions/workflows/ci.yml/badge.svg)](https://github.com/cbtpro/vscode-willump/actions/workflows/ci.yml) [![Powered by ChatGPT](https://img.shields.io/badge/Powered%20by-ChatGPT-10B981?logo=openai&logoColor=white)](https://chat.openai.com/) [![Powered by GitHub Copilot](https://img.shields.io/badge/Powered%20by-GitHub%20Copilot-2ea44f?logo=github&logoColor=white)](https://github.com/features/copilot)
 
 Willump 是一个面向 VS Code 的本地端口管理扩展，主要用于帮助开发者快速排查端口占用、查看本机端口列表，并在需要时终止占用指定端口的进程。
 
@@ -346,6 +346,17 @@ src/
 - Node.js / Web 服务开发者
 - 经常运行多个本地开发服务的工程师
 - 需要在 VS Code 内快速排查端口冲突的开发者
+
+## 致谢
+
+特别感谢在本项目开发过程中提供帮助的工具与服务：
+
+- ChatGPT（OpenAI） — 在代码示例、重构建议与问题排查上提供了大量帮助。  
+  链接: https://chat.openai.com/
+- GitHub Copilot — 在编码过程中提供自动补全与重构建议，显著提升开发效率。  
+  链接: https://github.com/features/copilot
+
+这些工具为本项目的迭代和质量提升带来了很大帮助，特此致谢。
 
 ## 许可证
 
