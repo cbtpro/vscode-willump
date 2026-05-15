@@ -49,6 +49,8 @@ const isKilling = ref(false);
 const errorMessage = ref('');
 const successMessage = ref('');
 const pendingKill = ref<KillTarget | null>(null);
+const isFullCommandVisible = ref(false);
+const fullCommandText = ref('');
 const visibleColumnKeys = ref<PortColumnKey[]>(['port', 'type', 'localAddress', 'listenAddress', 'pid', 'command']);
 const visibleProcessColumnKeys = ref<ProcessColumnKey[]>(['command', 'pid', 'ports', 'protocols', 'connectionCount']);
 const sortState = ref<{ key: PortColumnKey; direction: SortDirection }>({
@@ -339,6 +341,16 @@ function closeKillConfirm() {
 	pendingKill.value = null;
 }
 
+function openFullCommand(command?: string) {
+	fullCommandText.value = command ?? '';
+	isFullCommandVisible.value = true;
+}
+
+function closeFullCommand() {
+	isFullCommandVisible.value = false;
+	fullCommandText.value = '';
+}
+
 function confirmKillPort() {
 	if (!pendingKill.value) {
 		return;
@@ -563,5 +575,15 @@ onUnmounted(() => {
 				<a-button type="primary" status="danger" :loading="isKilling" @click="confirmKillPort">{{ t('ports.confirmKill') }}</a-button>
 			</div>
 		</a-modal>
+
+				<a-modal v-model:visible="isFullCommandVisible" :title="'Full Command'" :footer="false" :mask-closable="true">
+					<div class="full-command-modal">
+						<pre class="full-command-content">{{ fullCommandText }}</pre>
+						<div class="dialog-actions">
+							<a-button @click="closeFullCommand">{{ t('common.close') }}</a-button>
+							<a-button type="primary" @click="() => { navigator.clipboard && navigator.clipboard.writeText(fullCommandText); }">Copy</a-button>
+						</div>
+					</div>
+				</a-modal>
 	</main>
 </template>
