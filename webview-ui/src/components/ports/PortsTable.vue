@@ -1,6 +1,11 @@
 <script setup lang="ts">
-import IconSettings from '@arco-design/web-vue/es/icon/icon-settings';
 import IconSort from '@arco-design/web-vue/es/icon/icon-sort';
+import IconSortAscending from '@arco-design/web-vue/es/icon/icon-sort-ascending';
+import IconSortDescending from '@arco-design/web-vue/es/icon/icon-sort-descending';
+import { computed, toRef } from 'vue';
+import useTableSort from '../../composables/useTableSort';
+import ColumnSettingsDropdown from './ColumnSettingsDropdown.vue';
+import { t } from '../../i18n';
 import IconSortAscending from '@arco-design/web-vue/es/icon/icon-sort-ascending';
 import IconSortDescending from '@arco-design/web-vue/es/icon/icon-sort-descending';
 import { computed, toRef } from 'vue';
@@ -61,23 +66,7 @@ function isKillDisabled(record: PortTableRow) {
 				<template #title>
 					<div class="table-action-header">
 						<span>{{ t('ports.action') }}</span>
-						<a-dropdown trigger="click" position="br">
-							<a-button type="text" size="small" :title="t('ports.columnSettings')">
-								<IconSettings />
-							</a-button>
-							<template #content>
-								<div class="column-menu">
-									<a-checkbox
-										v-for="column in allColumns"
-										:key="column.key"
-										:model-value="isColumnVisible(column.key)"
-										@change="checked => emit('toggle-column', column.key, checked)"
-									>
-										{{ column.title }}
-									</a-checkbox>
-								</div>
-							</template>
-						</a-dropdown>
+						<ColumnSettingsDropdown :all-columns="allColumns" :current-columns="columns" @toggle-column="(key, checked) => emit('toggle-column', key, checked)" />
 					</div>
 				</template>
 				<template #cell="{ record }">
