@@ -48,8 +48,8 @@ const windowsProfile: PortCommandProfile = {
 	}),
 	getProcessName: pid => ({
 		type: 'file',
-		file: 'tasklist',
-		args: ['/FI', `PID eq ${pid}`, '/FO', 'CSV', '/NH']
+		file: 'powershell',
+		args: ['-NoProfile', '-Command', `Get-CimInstance Win32_Process -Filter "ProcessId=${pid}" | Select-Object -ExpandProperty CommandLine`]
 	}),
 	killPid: pid => ({
 		type: 'file',
@@ -111,10 +111,16 @@ const windowsProfile: PortCommandProfile = {
 		return uniquePorts(ports);
 	},
 	parseProcessName: stdout => {
-		const line = stdout.trim().split(/\r?\n/)[0] ?? '';
-		const firstColumn = parseCsvLine(line)[0];
-
-		return firstColumn && !firstColumn.startsWith('INFO:') ? firstColumn : undefined;
+		const out = stdout.trim();
+		if (!out) return undefined;
+		// If output looks like CSV from tasklist, parse first column; else treat as command line
+		const firstLine = out.split(/\r?\n/)[0];
+		if (firstLine.includes(',')) {
+			const firstColumn = parseCsvLine(firstLine)[0];
+			if (firstColumn && !firstColumn.startsWith('INFO:')) return firstColumn;
+		}
+		// Otherwise return full command line
+		return out.split(/\r?\n/)[0] || undefined;
 	},
 	parseProcessNameList: stdout => parseWindowsTaskList(stdout),
 	isEmptyListeningResult: () => false
