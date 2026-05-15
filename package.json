@@ -78,7 +78,8 @@
     "watch:webview": "vite build --watch --config vite.webview.config.ts",
     "pretest": "npm run compile && npm run lint",
     "lint": "eslint src",
-    "test": "vscode-test"
+    "test": "vscode-test",
+    "test:unit": "vitest"
   },
   "devDependencies": {
     "@types/mocha": "^10.0.10",
