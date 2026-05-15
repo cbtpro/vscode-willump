@@ -197,8 +197,8 @@ onUnmounted(() => {
 		</header>
 
 		<p v-if="workspacePath" class="muted-line">{{ t('git.currentProject') }}: {{ workspacePath }}</p>
-		<a-alert v-if="successMessage" type="success" :content="successMessage" />
-		<a-alert v-if="errorMessage" type="error" :content="errorMessage" />
+		<a-alert v-if="successMessage" type="success">{{ successMessage }}</a-alert>
+		<a-alert v-if="errorMessage" type="error">{{ errorMessage }}</a-alert>
 
 		<a-collapse :default-active-key="[]">
 			<a-collapse-item key="overview" :header="t('git.sections.overview')">
@@ -219,10 +219,9 @@ onUnmounted(() => {
 					<a-card class="config-panel" :title="t('git.currentProjectConfig')" :bordered="false">
 						<p>{{ t('git.identityPreview') }}: {{ config?.effectiveIdentity.name || '-' }} &lt;{{ config?.effectiveIdentity.email || '-' }}&gt;</p>
 						<p>{{ t('git.identitySource') }}: {{ config?.effectiveIdentity.source || '-' }}</p>
-						<a-alert
-							:type="config?.effectiveIdentity.isGithubNoreply ? 'success' : 'warning'"
-							:content="config?.effectiveIdentity.isGithubNoreply ? t('git.noreplyDetected') : t('git.noreplyTip')"
-						/>
+						<a-alert :type="config?.effectiveIdentity.isGithubNoreply ? 'success' : 'warning'">
+							{{ config?.effectiveIdentity.isGithubNoreply ? t('git.noreplyDetected') : t('git.noreplyTip') }}
+						</a-alert>
 						<a-form :model="form.local" layout="vertical">
 							<a-form-item :label="t('git.author')">
 								<a-input v-model="form.local.name" placeholder="user.name" :disabled="!form.local.available" />

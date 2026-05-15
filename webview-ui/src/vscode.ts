@@ -6,6 +6,7 @@ export interface PortInfo {
 	localAddress: string;
 	listenAddress: string;
 	service?: string;
+	processPath?: string;
 	commandFull?: string;
 }
 

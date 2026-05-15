@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import IconCheck from '@arco-design/web-vue/es/icon/icon-check';
+import IconCopy from '@arco-design/web-vue/es/icon/icon-copy';
 import IconSettings from '@arco-design/web-vue/es/icon/icon-settings';
 import IconSort from '@arco-design/web-vue/es/icon/icon-sort';
 import IconSortAscending from '@arco-design/web-vue/es/icon/icon-sort-ascending';
@@ -17,10 +19,11 @@ interface WebviewMessage {
 	message?: string;
 }
 
-type PortColumnKey = 'port' | 'type' | 'localAddress' | 'listenAddress' | 'pid' | 'command' | 'commandFull';
-type ProcessColumnKey = 'command' | 'pid' | 'ports' | 'protocols' | 'connectionCount';
+type PortColumnKey = 'port' | 'type' | 'localAddress' | 'listenAddress' | 'pid' | 'command' | 'processPath' | 'commandFull';
+type ProcessColumnKey = 'command' | 'pid' | 'ports' | 'protocols' | 'connectionCount' | 'processPath' | 'commandFull';
 type SortDirection = 'asc' | 'desc' | '';
 type PortViewMode = 'connections' | 'processes';
+type CopyState = 'idle' | 'success' | 'error';
 
 interface KillTarget {
 	port: string;
@@ -35,6 +38,8 @@ interface NetworkProcessRow {
 	ports: string;
 	protocols: string;
 	connectionCount: number;
+	processPath: string;
+	commandFull: string;
 }
 
 const vscode = getVsCodeApi();
@@ -51,6 +56,8 @@ const successMessage = ref('');
 const pendingKill = ref<KillTarget | null>(null);
 const isFullCommandVisible = ref(false);
 const fullCommandText = ref('');
+const isCopyingFullCommand = ref(false);
+const fullCommandCopyState = ref<CopyState>('idle');
 const visibleColumnKeys = ref<PortColumnKey[]>(['port', 'type', 'localAddress', 'listenAddress', 'pid', 'command']);
 const visibleProcessColumnKeys = ref<ProcessColumnKey[]>(['command', 'pid', 'ports', 'protocols', 'connectionCount']);
 const sortState = ref<{ key: PortColumnKey; direction: SortDirection }>({
@@ -61,6 +68,7 @@ const processSortState = ref<{ key: ProcessColumnKey; direction: SortDirection }
 	key: 'connectionCount',
 	direction: 'desc'
 });
+let fullCommandCopyResetTimer: ReturnType<typeof setTimeout> | undefined;
 const isKillConfirmVisible = computed({
 	get: () => Boolean(pendingKill.value),
 	set: visible => {
@@ -78,7 +86,9 @@ const filteredPorts = computed(() => {
 	}
 
 	return ports.value.filter(item =>
-		[item.port, item.pid, item.command, item.type, item.localAddress, item.listenAddress].some(field => field.toLowerCase().includes(value))
+		[item.port, item.pid, item.command, item.type, item.localAddress, item.listenAddress, item.processPath ?? '', item.commandFull ?? ''].some(field =>
+			field.toLowerCase().includes(value)
+		)
 	);
 });
 
@@ -92,12 +102,36 @@ const filteredProcessRows = computed(() => {
 	}
 
 	return processRows.value.filter(item =>
-		[item.command, item.pid, item.ports, item.protocols, String(item.connectionCount)].some(field => field.toLowerCase().includes(value))
+		[item.command, item.pid, item.ports, item.protocols, item.processPath, item.commandFull, String(item.connectionCount)].some(field =>
+			field.toLowerCase().includes(value)
+		)
 	);
 });
 const totalCountLabel = computed(() => (viewMode.value === 'processes' ? t('ports.processCount') : t('ports.occupiedCount')));
 const totalCount = computed(() => (viewMode.value === 'processes' ? processRows.value.length : ports.value.length));
 const filteredCount = computed(() => (viewMode.value === 'processes' ? filteredProcessRows.value.length : filteredPorts.value.length));
+const fullCommandCopyFeedback = computed(() => {
+	if (fullCommandCopyState.value === 'success') {
+		return { type: 'success' as const, content: t('ports.copySuccess') };
+	}
+
+	if (fullCommandCopyState.value === 'error') {
+		return { type: 'error' as const, content: t('ports.copyFailed') };
+	}
+
+	return null;
+});
+const fullCommandCopyButtonText = computed(() => {
+	if (isCopyingFullCommand.value) {
+		return t('ports.copying');
+	}
+
+	if (fullCommandCopyState.value === 'success') {
+		return t('ports.copied');
+	}
+
+	return t('common.copy');
+});
 const portColumns = computed<Array<{ key: PortColumnKey; title: string; width?: number }>>(() => [
 	{ key: 'port', title: t('ports.port'), width: 110 },
 	{ key: 'type', title: t('ports.type'), width: 160 },
@@ -105,14 +139,17 @@ const portColumns = computed<Array<{ key: PortColumnKey; title: string; width?: 
 	{ key: 'listenAddress', title: t('ports.listenAddress'), width: 180 },
 	{ key: 'pid', title: t('ports.pid'), width: 120 },
 	{ key: 'command', title: t('ports.command') },
-	{ key: 'commandFull', title: t('ports.viewFullCommand'), width: 420 }
+	{ key: 'processPath', title: t('ports.processPath'), width: 260 },
+	{ key: 'commandFull', title: t('ports.startCommand'), width: 420 }
 ]);
 const processColumns = computed<Array<{ key: ProcessColumnKey; title: string; width?: number }>>(() => [
 	{ key: 'command', title: t('ports.command') },
 	{ key: 'pid', title: t('ports.pid'), width: 120 },
 	{ key: 'ports', title: t('ports.ports'), width: 220 },
 	{ key: 'protocols', title: t('ports.protocols'), width: 180 },
-	{ key: 'connectionCount', title: t('ports.connectionCount'), width: 140 }
+	{ key: 'connectionCount', title: t('ports.connectionCount'), width: 140 },
+	{ key: 'processPath', title: t('ports.processPath'), width: 260 },
+	{ key: 'commandFull', title: t('ports.startCommand'), width: 420 }
 ]);
 const visiblePortColumns = computed(() => portColumns.value.filter(column => isColumnVisible(column.key)));
 const visibleProcessColumns = computed(() => processColumns.value.filter(column => isProcessColumnVisible(column.key)));
@@ -155,7 +192,7 @@ function compareColumnValue(left: string | number, right: string | number, key: 
 }
 
 function aggregateNetworkProcesses(items: PortInfo[]): NetworkProcessRow[] {
-	const rows = new Map<string, { pid: string; command: string; ports: Set<string>; protocols: Set<string>; connectionCount: number }>();
+	const rows = new Map<string, { pid: string; command: string; ports: Set<string>; protocols: Set<string>; connectionCount: number; processPath: string; commandFull: string }>();
 
 	for (const item of items) {
 		const pid = item.pid || '-';
@@ -166,7 +203,9 @@ function aggregateNetworkProcesses(items: PortInfo[]): NetworkProcessRow[] {
 			command,
 			ports: new Set<string>(),
 			protocols: new Set<string>(),
-			connectionCount: 0
+			connectionCount: 0,
+			processPath: item.processPath ?? '',
+			commandFull: item.commandFull ?? ''
 		};
 
 		if (item.port) {
@@ -178,6 +217,8 @@ function aggregateNetworkProcesses(items: PortInfo[]): NetworkProcessRow[] {
 			row.protocols.add(protocol);
 		}
 
+		row.processPath ||= item.processPath ?? '';
+		row.commandFull ||= item.commandFull ?? '';
 		row.connectionCount += 1;
 		rows.set(key, row);
 	}
@@ -188,7 +229,9 @@ function aggregateNetworkProcesses(items: PortInfo[]): NetworkProcessRow[] {
 		command: row.command,
 		ports: sortPortValues(Array.from(row.ports)).join(', '),
 		protocols: Array.from(row.protocols).sort().join(', '),
-		connectionCount: row.connectionCount
+		connectionCount: row.connectionCount,
+		processPath: row.processPath,
+		commandFull: row.commandFull
 	}));
 }
 
@@ -341,7 +384,29 @@ function closeKillConfirm() {
 	pendingKill.value = null;
 }
 
+function clearFullCommandCopyFeedback() {
+	if (fullCommandCopyResetTimer) {
+		clearTimeout(fullCommandCopyResetTimer);
+		fullCommandCopyResetTimer = undefined;
+	}
+
+	isCopyingFullCommand.value = false;
+	fullCommandCopyState.value = 'idle';
+}
+
+function scheduleFullCommandCopyFeedbackReset() {
+	if (fullCommandCopyResetTimer) {
+		clearTimeout(fullCommandCopyResetTimer);
+	}
+
+	fullCommandCopyResetTimer = setTimeout(() => {
+		fullCommandCopyState.value = 'idle';
+		fullCommandCopyResetTimer = undefined;
+	}, 2000);
+}
+
 function openFullCommand(command?: string) {
+	clearFullCommandCopyFeedback();
 	fullCommandText.value = command ?? '';
 	isFullCommandVisible.value = true;
 }
@@ -349,17 +414,34 @@ function openFullCommand(command?: string) {
 function closeFullCommand() {
 	isFullCommandVisible.value = false;
 	fullCommandText.value = '';
+	clearFullCommandCopyFeedback();
 }
 
-function copyFullCommand() {
+async function copyFullCommand() {
+	if (isCopyingFullCommand.value) {
+		return;
+	}
+
+	if (fullCommandCopyResetTimer) {
+		clearTimeout(fullCommandCopyResetTimer);
+		fullCommandCopyResetTimer = undefined;
+	}
+
+	isCopyingFullCommand.value = true;
+	fullCommandCopyState.value = 'idle';
+
 	try {
-		navigator.clipboard && navigator.clipboard.writeText(fullCommandText.value || '');
-		// give user feedback
-		successMessage.value = 'Copied to clipboard';
-		setTimeout(() => (successMessage.value = ''), 2000);
+		if (!navigator.clipboard?.writeText) {
+			throw new Error('Clipboard API is not available');
+		}
+
+		await navigator.clipboard.writeText(fullCommandText.value || '');
+		fullCommandCopyState.value = 'success';
 	} catch (err) {
-		errorMessage.value = t('ports.loadFailed');
-		setTimeout(() => (errorMessage.value = ''), 2000);
+		fullCommandCopyState.value = 'error';
+	} finally {
+		isCopyingFullCommand.value = false;
+		scheduleFullCommandCopyFeedbackReset();
 	}
 }
 
@@ -427,6 +509,7 @@ onMounted(() => {
 
 onUnmounted(() => {
 	window.removeEventListener('message', handleMessage);
+	clearFullCommandCopyFeedback();
 });
 </script>
 
@@ -460,8 +543,8 @@ onUnmounted(() => {
 			<a-input-search v-model="keyword" class="search" allow-clear :placeholder="t('ports.searchPlaceholder')" />
 		</a-card>
 
-		<a-alert v-if="successMessage" type="success" :content="successMessage" />
-		<a-alert v-if="errorMessage" type="error" :content="errorMessage" />
+		<a-alert v-if="successMessage" type="success">{{ successMessage }}</a-alert>
+		<a-alert v-if="errorMessage" type="error">{{ errorMessage }}</a-alert>
 
 		<a-table
 			v-if="viewMode === 'connections'"
@@ -469,7 +552,7 @@ onUnmounted(() => {
 			:loading="isRefreshing"
 			:pagination="false"
 			:bordered="{ cell: true }"
-			:scroll="{ x: 960 }"
+			:scroll="{ x: 1240 }"
 			row-key="rowId"
 		>
 			<template #columns>
@@ -506,7 +589,7 @@ onUnmounted(() => {
 					</template>
 					<template #cell="{ record }">
 						<a-space>
-							<a-button v-if="record.commandFull && (record.commandFull.trim() !== (record.command || '').trim() || record.commandFull.length > 50)" type="text" size="small" @click="openFullCommand(record.commandFull)">
+							<a-button v-if="record.commandFull" type="text" size="small" @click="openFullCommand(record.commandFull)">
 								{{ t('ports.view') }}
 							</a-button>
 							<a-button type="text" status="danger" size="small" :disabled="isKilling" @click="openKillConfirm(record)">
@@ -527,7 +610,7 @@ onUnmounted(() => {
 			:loading="isRefreshing"
 			:pagination="false"
 			:bordered="{ cell: true }"
-			:scroll="{ x: 860 }"
+			:scroll="{ x: 1240 }"
 			row-key="rowId"
 		>
 			<template #columns>
@@ -564,7 +647,7 @@ onUnmounted(() => {
 					</template>
 					<template #cell="{ record }">
 						<a-space>
-							<a-button v-if="record.commandFull && (record.commandFull.trim() !== (record.command || '').trim() || record.commandFull.length > 50)" type="text" size="small" @click="openFullCommand(record.commandFull)">
+							<a-button v-if="record.commandFull" type="text" size="small" @click="openFullCommand(record.commandFull)">
 								{{ t('ports.view') }}
 							</a-button>
 							<a-button
@@ -598,25 +681,49 @@ onUnmounted(() => {
 			</div>
 		</a-modal>
 
-				<a-modal v-model:visible="isFullCommandVisible" :title="'Full Command'" :footer="false" :mask-closable="true">
-					<div class="full-command-modal">
-							<pre class="full-command-content">{{ fullCommandText }}</pre>
-						<div class="dialog-actions">
-							<a-button @click="closeFullCommand">{{ t('common.close') }}</a-button>
-							<a-button type="primary" @click="copyFullCommand">Copy</a-button>
-						</div>
-					</div>
-				</a-modal>
+		<a-modal v-model:visible="isFullCommandVisible" :title="t('ports.startCommand')" :footer="false" :mask-closable="!isCopyingFullCommand">
+			<div class="full-command-modal">
+				<pre class="full-command-content">{{ fullCommandText }}</pre>
+				<a-alert v-if="fullCommandCopyFeedback" class="full-command-feedback" :type="fullCommandCopyFeedback.type">
+					{{ fullCommandCopyFeedback.content }}
+				</a-alert>
+				<div class="dialog-actions">
+					<a-button :disabled="isCopyingFullCommand" @click="closeFullCommand">{{ t('common.close') }}</a-button>
+					<a-button type="primary" :status="fullCommandCopyState === 'success' ? 'success' : 'normal'" :loading="isCopyingFullCommand" @click="copyFullCommand">
+						<template #icon>
+							<IconCheck v-if="fullCommandCopyState === 'success'" />
+							<IconCopy v-else />
+						</template>
+						{{ fullCommandCopyButtonText }}
+					</a-button>
+				</div>
+			</div>
+		</a-modal>
 	</main>
 </template>
 
 <style scoped>
+.full-command-modal {
+	display: grid;
+	gap: 12px;
+}
+
 .full-command-content {
 	white-space: pre-wrap;
 	word-break: break-word;
 	overflow-x: auto;
 	max-height: 60vh;
 	display: block;
+	margin: 0;
+	padding: 12px;
+	border: 1px solid var(--color-border-2);
+	border-radius: 6px;
+	background: var(--color-fill-2);
+	color: var(--color-text-1);
+}
+
+.full-command-feedback {
+	margin: 0;
 }
 
 .table-action-header a-button {

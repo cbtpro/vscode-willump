@@ -6,7 +6,14 @@ export interface PortInfo {
 	localAddress: string;
 	listenAddress: string;
 	service?: string;
+	processPath?: string;
 	commandFull?: string;
+}
+
+export interface ProcessDetails {
+	name?: string;
+	processPath?: string;
+	commandLine?: string;
 }
 
 export type PortScanMode = 'listening' | 'all';
@@ -25,12 +32,16 @@ export type CommandSpec =
 export interface PortCommandProfile {
 	checkPortUsage(port: string): CommandSpec;
 	findListeningPids(port: string): CommandSpec;
+	getProcessDetails?(pid: string): CommandSpec;
 	getProcessName(pid: string): CommandSpec;
 	killPid(pid: string): CommandSpec;
+	listProcessDetails?(pids: string[]): CommandSpec;
 	listProcessNames?(): CommandSpec;
 	listAllPorts(): CommandSpec;
 	listListeningPorts(): CommandSpec;
 	parseAllPorts(stdout: string): PortInfo[];
+	parseProcessDetails?(stdout: string, pid: string): ProcessDetails | undefined;
+	parseProcessDetailsList?(stdout: string): Map<string, ProcessDetails>;
 	parseListeningPids(stdout: string, port: string): string[];
 	parseListeningPorts(stdout: string): PortInfo[];
 	parseProcessName(stdout: string, pid: string): string | undefined;
@@ -47,6 +58,15 @@ const windowsProfile: PortCommandProfile = {
 		type: 'shell',
 		command: 'netstat -ano'
 	}),
+	getProcessDetails: pid => ({
+		type: 'file',
+		file: 'powershell',
+		args: [
+			'-NoProfile',
+			'-Command',
+			`Get-CimInstance Win32_Process -Filter "ProcessId=${pid}" | Select-Object ProcessId,Name,ExecutablePath,CommandLine | ConvertTo-Json -Compress`
+		]
+	}),
 	getProcessName: pid => ({
 		type: 'file',
 		file: 'powershell',
@@ -56,6 +76,15 @@ const windowsProfile: PortCommandProfile = {
 		type: 'file',
 		file: 'taskkill',
 		args: ['/PID', pid, '/F']
+	}),
+	listProcessDetails: pids => ({
+		type: 'file',
+		file: 'powershell',
+		args: [
+			'-NoProfile',
+			'-Command',
+			`$ids=@(${pids.filter(pid => /^\d+$/.test(pid)).join(',')}); Get-CimInstance Win32_Process | Where-Object { $ids -contains $_.ProcessId } | Select-Object ProcessId,Name,ExecutablePath,CommandLine | ConvertTo-Json -Compress`
+		]
 	}),
 	listProcessNames: () => ({
 		type: 'file',
@@ -113,16 +142,23 @@ const windowsProfile: PortCommandProfile = {
 	},
 	parseProcessName: stdout => {
 		const out = stdout.trim();
-		if (!out) return undefined;
+		if (!out) {
+			return undefined;
+		}
+
 		// If output looks like CSV from tasklist, parse first column; else treat as command line
 		const firstLine = out.split(/\r?\n/)[0];
 		if (firstLine.includes(',')) {
 			const firstColumn = parseCsvLine(firstLine)[0];
-			if (firstColumn && !firstColumn.startsWith('INFO:')) return firstColumn;
+			if (firstColumn && !firstColumn.startsWith('INFO:')) {
+				return firstColumn;
+			}
 		}
 		// Otherwise return full command line
 		return out.split(/\r?\n/)[0] || undefined;
 	},
+	parseProcessDetails: stdout => parseWindowsProcessDetails(stdout),
+	parseProcessDetailsList: stdout => parseWindowsProcessDetailsList(stdout),
 	parseProcessNameList: stdout => parseWindowsTaskList(stdout),
 	isEmptyListeningResult: () => false
 };
@@ -142,6 +178,11 @@ const posixProfile: PortCommandProfile = {
 		type: 'file',
 		file: 'lsof',
 		args: [`-tiTCP:${port}`, '-sTCP:LISTEN']
+	}),
+	getProcessDetails: pid => ({
+		type: 'file',
+		file: 'ps',
+		args: ['-p', pid, '-o', 'pid=', '-o', 'comm=', '-o', 'command=']
 	}),
 	getProcessName: pid => ({
 		type: 'file',
@@ -195,6 +236,7 @@ const posixProfile: PortCommandProfile = {
 
 		return name || undefined;
 	},
+	parseProcessDetails: stdout => parsePosixProcessDetails(stdout),
 	isEmptyListeningResult: error => error.code === 1 && !error.stdout?.trim()
 };
 
@@ -281,6 +323,71 @@ function parseWindowsTaskList(stdout: string): Map<string, string> {
 	}
 
 	return namesByPid;
+}
+
+function parseWindowsProcessDetails(stdout: string): ProcessDetails | undefined {
+	const details = Array.from(parseWindowsProcessDetailsList(stdout).values())[0];
+	return details;
+}
+
+function parseWindowsProcessDetailsList(stdout: string): Map<string, ProcessDetails> {
+	const detailsByPid = new Map<string, ProcessDetails>();
+	const value = stdout.trim();
+
+	if (!value) {
+		return detailsByPid;
+	}
+
+	try {
+		const parsed = JSON.parse(value) as unknown;
+		const items = Array.isArray(parsed) ? parsed : [parsed];
+
+		for (const item of items) {
+			if (!item || typeof item !== 'object') {
+				continue;
+			}
+
+			const record = item as Record<string, unknown>;
+			const pid = String(record.ProcessId ?? '');
+
+			if (!/^\d+$/.test(pid)) {
+				continue;
+			}
+
+			detailsByPid.set(pid, {
+				name: toOptionalString(record.Name),
+				processPath: toOptionalString(record.ExecutablePath),
+				commandLine: toOptionalString(record.CommandLine)
+			});
+		}
+	} catch (err) {
+		return detailsByPid;
+	}
+
+	return detailsByPid;
+}
+
+function parsePosixProcessDetails(stdout: string): ProcessDetails | undefined {
+	const line = stdout.trim().split(/\r?\n/)[0] ?? '';
+	const match = line.match(/^\s*(\d+)\s+(\S+)\s+(.+)$/);
+
+	if (!match) {
+		return undefined;
+	}
+
+	const processPath = match[2];
+	const commandLine = match[3];
+	const name = processPath.split(/[\\/]/).filter(Boolean).pop();
+
+	return {
+		name: name || processPath,
+		processPath,
+		commandLine
+	};
+}
+
+function toOptionalString(value: unknown): string | undefined {
+	return typeof value === 'string' && value.trim() ? value.trim() : undefined;
 }
 
 function parsePosixLsofLine(line: string): PortInfo | undefined {

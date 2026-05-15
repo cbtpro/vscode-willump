@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import * as childProcess from 'child_process';
 import { promisify } from 'util';
 import { localize } from '../i18n';
-import { CommandSpec, getPortCommandProfile, PortInfo, PortScanMode, describePort } from './port.commands';
+import { CommandSpec, getPortCommandProfile, PortInfo, PortScanMode, describePort, ProcessDetails } from './port.commands';
 
 /**
  * 检查指定端口的使用情况。
@@ -149,7 +149,25 @@ export async function getPortListData(mode: PortScanMode = 'listening'): Promise
 
 async function enrichProcessNames(ports: PortInfo[], profile = getPortCommandProfile()): Promise<PortInfo[]> {
 	const namesByPid = new Map<string, string>();
+	const detailsByPid = new Map<string, ProcessDetails>();
 	const pids = Array.from(new Set(ports.map(item => item.pid).filter(pid => /^\d+$/.test(pid))));
+
+	if (profile.listProcessDetails && profile.parseProcessDetailsList && pids.length) {
+		try {
+			const { stdout } = await executeCommand(profile.listProcessDetails(pids), { maxBuffer: 1024 * 1024 * 4, timeout: 5000 });
+			const processDetails = profile.parseProcessDetailsList(stdout);
+
+			for (const pid of pids) {
+				const details = processDetails.get(pid);
+
+				if (details) {
+					detailsByPid.set(pid, details);
+				}
+			}
+		} catch (err) {
+			// Fall back to lightweight process-name lookup and per-process details below.
+		}
+	}
 
 	if (profile.listProcessNames && profile.parseProcessNameList && pids.length) {
 		try {
@@ -169,6 +187,26 @@ async function enrichProcessNames(ports: PortInfo[], profile = getPortCommandPro
 	}
 
 	const missingPids = pids.filter(pid => !namesByPid.has(pid));
+	const missingDetailPids = pids.filter(pid => !detailsByPid.has(pid));
+
+	await Promise.all(
+		missingDetailPids.map(async pid => {
+			if (!profile.getProcessDetails || !profile.parseProcessDetails) {
+				return;
+			}
+
+			try {
+				const { stdout } = await executeCommand(profile.getProcessDetails(pid), { maxBuffer: 1024 * 1024, timeout: 3000 });
+				const details = profile.parseProcessDetails(stdout, pid);
+
+				if (details) {
+					detailsByPid.set(pid, details);
+				}
+			} catch (err) {
+				// Process details can be unavailable for short-lived or protected processes.
+			}
+		})
+	);
 
 	await Promise.all(
 		missingPids.map(async pid => {
@@ -185,21 +223,27 @@ async function enrichProcessNames(ports: PortInfo[], profile = getPortCommandPro
 	);
 
 	return ports.map(item => {
-		const pidName = namesByPid.get(item.pid) ?? item.command;
+		const details = detailsByPid.get(item.pid);
+		const pidName = details?.name ?? namesByPid.get(item.pid) ?? item.command;
 		const service = describePort(item.port);
-		const commandFull = service ? `${pidName} (${service})` : pidName;
-		// derive short display name from the command (basename of the executable)
-		const firstToken = pidName.trim().split(/\s+/)[0] ?? '';
-		const executablePath = firstToken.match(/^"([^"]+)"/)?.[1] ?? firstToken;
-		const short = executablePath.split(/[\\\/]/).filter(Boolean).pop() ?? executablePath;		const commandShort = service ? `${short} (${service})` : short;
+		const commandFull = details?.commandLine ?? namesByPid.get(item.pid) ?? pidName;
+		const commandShort = service ? `${getProcessDisplayName(pidName)} (${service})` : getProcessDisplayName(pidName);
 
 		return {
 			...item,
 			command: commandShort,
 			commandFull,
+			processPath: details?.processPath,
 			service
 		};
 	});
+}
+
+function getProcessDisplayName(command: string): string {
+	const firstToken = command.trim().split(/\s+/)[0] ?? '';
+	const executablePath = firstToken.match(/^"([^"]+)"/)?.[1] ?? firstToken;
+
+	return executablePath.split(/[\\/]/).filter(Boolean).pop() ?? executablePath;
 }
 
 async function getListeningPidsByPort(port: string): Promise<string[]> {
