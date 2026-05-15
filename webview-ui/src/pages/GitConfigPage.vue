@@ -2,6 +2,9 @@
 import { computed, onMounted, onUnmounted, reactive, ref } from 'vue';
 import { t } from '../i18n';
 import { getVsCodeApi, type GitConfigInfo, type GitConfigScope } from '../vscode';
+import GitOverview from '../components/git/GitOverview.vue';
+import GitIdentity from '../components/git/GitIdentity.vue';
+import GitTemplates from '../components/git/GitTemplates.vue';
 
 interface GitMessage {
 	type: 'gitConfigUpdated' | 'gitConfigSaved';
@@ -202,82 +205,24 @@ onUnmounted(() => {
 
 		<a-collapse :default-active-key="[]">
 			<a-collapse-item key="overview" :header="t('git.sections.overview')">
-				<a-table :data="workspaceRows" :pagination="false" :bordered="{ cell: true }" :scroll="{ x: 1280 }" row-key="path">
-					<template #columns>
-						<a-table-column :title="t('git.repo')" data-index="name" :width="140" />
-						<a-table-column :title="t('git.author')" data-index="effectiveName" :width="160" />
-						<a-table-column :title="t('git.email')" data-index="effectiveEmail" :width="220" />
-						<a-table-column :title="t('git.branch')" data-index="branch" :width="160" />
-						<a-table-column :title="t('git.upstream')" data-index="upstream" :width="180" />
-						<a-table-column title="Remote" data-index="remote" :width="420" />
-					</template>
-				</a-table>
+				<GitOverview :workspaces="workspaceRows" />
 			</a-collapse-item>
 
 			<a-collapse-item key="identity" :header="t('git.sections.identity')">
-				<section class="config-grid">
-					<a-card class="config-panel" :title="t('git.currentProjectConfig')" :bordered="false">
-						<p>{{ t('git.identityPreview') }}: {{ config?.effectiveIdentity.name || '-' }} &lt;{{ config?.effectiveIdentity.email || '-' }}&gt;</p>
-						<p>{{ t('git.identitySource') }}: {{ config?.effectiveIdentity.source || '-' }}</p>
-						<a-alert :type="config?.effectiveIdentity.isGithubNoreply ? 'success' : 'warning'">
-							{{ config?.effectiveIdentity.isGithubNoreply ? t('git.noreplyDetected') : t('git.noreplyTip') }}
-						</a-alert>
-						<a-form :model="form.local" layout="vertical">
-							<a-form-item :label="t('git.author')">
-								<a-input v-model="form.local.name" placeholder="user.name" :disabled="!form.local.available" />
-							</a-form-item>
-							<a-form-item :label="t('git.email')">
-								<a-input v-model="form.local.email" placeholder="user.email" :disabled="!form.local.available" />
-							</a-form-item>
-						</a-form>
-						<a-button type="primary" :disabled="!form.local.available" :loading="isSaving === 'identity-local'" @click="saveGitConfig('local')">
-							{{ t('git.saveCurrent') }}
-						</a-button>
-					</a-card>
-
-					<a-card class="config-panel" :title="t('git.globalConfig')" :bordered="false">
-						<a-form :model="form.global" layout="vertical">
-							<a-form-item :label="t('git.author')">
-								<a-input v-model="form.global.name" placeholder="user.name" />
-							</a-form-item>
-							<a-form-item :label="t('git.email')">
-								<a-input v-model="form.global.email" placeholder="user.email" />
-							</a-form-item>
-						</a-form>
-						<a-button type="primary" :loading="isSaving === 'identity-global'" @click="saveGitConfig('global')">{{ t('git.saveGlobal') }}</a-button>
-					</a-card>
-				</section>
+				<GitIdentity :form="form" :config="config" :is-saving="isSaving" @save="saveGitConfig" />
 			</a-collapse-item>
 
 			<a-collapse-item key="templates" :header="t('git.sections.templates')">
-				<section class="config-grid">
-					<a-card class="config-panel" :title="t('git.templateCreate')" :bordered="false">
-						<a-form :model="templateForm" layout="vertical">
-							<a-form-item :label="t('git.templateName')"><a-input v-model="templateForm.name" /></a-form-item>
-							<a-form-item :label="t('git.author')"><a-input v-model="templateForm.author" /></a-form-item>
-							<a-form-item :label="t('git.email')"><a-input v-model="templateForm.email" /></a-form-item>
-						</a-form>
-						<a-button type="primary" @click="saveTemplate">{{ t('git.templateSave') }}</a-button>
-					</a-card>
-					<a-card class="config-panel" :title="t('git.templateList')" :bordered="false">
-						<a-empty v-if="!identityTemplates.length" :description="t('git.templateEmpty')" />
-						<div v-for="(template, index) in identityTemplates" :key="`${template.name}-${index}`" class="template-row">
-							<div>
-								<strong>{{ template.name }}</strong>
-								<p>{{ template.author }} &lt;{{ template.email }}&gt;</p>
-							</div>
-							<a-space>
-								<a-button size="small" @click="applyTemplate(template, 'local')">{{ t('git.applyLocal') }}</a-button>
-								<a-button size="small" @click="applyTemplate(template, 'global')">{{ t('git.applyGlobal') }}</a-button>
-								<a-button size="small" status="danger" @click="removeTemplate(index)">{{ t('common.delete') }}</a-button>
-							</a-space>
-						</div>
-					</a-card>
-				</section>
-				<a-card class="config-panel" :title="t('git.noreplyGenerator')" :bordered="false">
-					<a-input-search v-model="githubUsername" :button-text="t('git.useLocal')" placeholder="GitHub username" @search="useNoreplyEmail('local')" />
-					<p class="muted-line">{{ generatedNoreplyEmail || t('git.noreplyGenerateTip') }}</p>
-				</a-card>
+				<GitTemplates
+					:identity-templates="identityTemplates"
+					:template-form="templateForm"
+					:github-username="githubUsername"
+					:generated-noreply-email="generatedNoreplyEmail"
+					@save-template="saveTemplate"
+					@apply-template="applyTemplate"
+					@remove-template="removeTemplate"
+					@use-noreply="useNoreplyEmail"
+				/>
 			</a-collapse-item>
 
 			<a-collapse-item key="remote" :header="t('git.sections.remote')">
