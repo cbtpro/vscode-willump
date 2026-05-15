@@ -3,6 +3,8 @@ export interface PortInfo {
 	pid: string;
 	command: string;
 	type: string;
+	localAddress: string;
+	listenAddress: string;
 }
 
 export type PortScanMode = 'listening' | 'all';

@@ -39,7 +39,9 @@
     "kill": "终止",
     "killFailed": "终止进程失败",
     "killSuccess": "已终止端口 {port} 的进程 {pid}",
+    "listenAddress": "监听地址",
     "listening": "监听端口",
+    "localAddress": "本地地址",
     "loadFailed": "获取端口数据失败",
     "noMatch": "没有匹配的端口",
     "noProcessData": "暂无网络进程数据",
@@ -50,7 +52,7 @@
     "processAggregation": "进程聚合",
     "processCount": "网络进程",
     "protocols": "协议",
-    "searchPlaceholder": "输入端口、PID、程序或协议",
+    "searchPlaceholder": "输入端口、地址、PID、程序或协议",
     "subtitle": "查看当前系统端口、PID 和占用程序。",
     "title": "端口占用",
     "type": "类型"

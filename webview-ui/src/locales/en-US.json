@@ -39,7 +39,9 @@
     "kill": "Terminate",
     "killFailed": "Failed to terminate process",
     "killSuccess": "Terminated process {pid} on port {port}",
+    "listenAddress": "Listen Address",
     "listening": "Listening Ports",
+    "localAddress": "Local Address",
     "loadFailed": "Failed to load port data",
     "noMatch": "No matching ports",
     "noProcessData": "No network process data",
@@ -50,7 +52,7 @@
     "processAggregation": "Process Summary",
     "processCount": "Processes",
     "protocols": "Protocols",
-    "searchPlaceholder": "Search port, PID, program, or protocol",
+    "searchPlaceholder": "Search port, address, PID, program, or protocol",
     "subtitle": "View local ports, PIDs, and owning programs.",
     "title": "Ports",
     "type": "Type"

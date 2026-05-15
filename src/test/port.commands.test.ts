@@ -75,8 +75,9 @@ suite('Port Command Profile Test Suite', () => {
 		].join('\n');
 
 		assert.deepStrictEqual(profile.parseListeningPorts(stdout), [
-			{ command: 'java', pid: '50324', port: '8080', type: 'TCP LISTEN' },
-			{ command: 'node', pid: '61000', port: '3000', type: 'TCP LISTEN' }
+			{ command: 'java', pid: '50324', port: '8080', type: 'TCP LISTEN', localAddress: '*:8080', listenAddress: '*' },
+			{ command: 'node', pid: '61000', port: '3000', type: 'TCP LISTEN', localAddress: '127.0.0.1:3000', listenAddress: '127.0.0.1' },
+			{ command: 'node', pid: '61000', port: '3000', type: 'TCP LISTEN', localAddress: '*:3000', listenAddress: '*' }
 		]);
 	});
 
@@ -90,9 +91,9 @@ suite('Port Command Profile Test Suite', () => {
 		].join('\n');
 
 		assert.deepStrictEqual(profile.parseAllPorts(stdout), [
-			{ command: 'java', pid: '50324', port: '8080', type: 'TCP LISTEN' },
-			{ command: 'Google', pid: '83903', port: '50100', type: 'TCP ESTABLISHED' },
-			{ command: 'mDNS', pid: '200', port: '5353', type: 'UDP' }
+			{ command: 'java', pid: '50324', port: '8080', type: 'TCP LISTEN', localAddress: '*:8080', listenAddress: '*' },
+			{ command: 'Google', pid: '83903', port: '50100', type: 'TCP ESTABLISHED', localAddress: '127.0.0.1:50100', listenAddress: '' },
+			{ command: 'mDNS', pid: '200', port: '5353', type: 'UDP', localAddress: '*:5353', listenAddress: '' }
 		]);
 	});
 
@@ -131,8 +132,8 @@ suite('Port Command Profile Test Suite', () => {
 		].join('\n');
 
 		assert.deepStrictEqual(profile.parseListeningPorts(stdout), [
-			{ command: 'Unknown', pid: '50324', port: '8080', type: 'TCP LISTENING' },
-			{ command: 'Unknown', pid: '61000', port: '3000', type: 'TCP LISTENING' }
+			{ command: 'Unknown', pid: '50324', port: '8080', type: 'TCP LISTENING', localAddress: '0.0.0.0:8080', listenAddress: '0.0.0.0' },
+			{ command: 'Unknown', pid: '61000', port: '3000', type: 'TCP LISTENING', localAddress: '[::]:3000', listenAddress: '[::]' }
 		]);
 	});
 
@@ -146,8 +147,8 @@ suite('Port Command Profile Test Suite', () => {
 		].join('\n');
 
 		assert.deepStrictEqual(profile.parseListeningPorts(stdout), [
-			{ command: 'Unknown', pid: '1111', port: '5173', type: 'TCP LISTENING' },
-			{ command: 'Unknown', pid: '2222', port: '9229', type: 'TCP LISTENING' }
+			{ command: 'Unknown', pid: '1111', port: '5173', type: 'TCP LISTENING', localAddress: '0.0.0.0:5173', listenAddress: '0.0.0.0' },
+			{ command: 'Unknown', pid: '2222', port: '9229', type: 'TCP LISTENING', localAddress: '[::]:9229', listenAddress: '[::]' }
 		]);
 	});
 
@@ -162,9 +163,9 @@ suite('Port Command Profile Test Suite', () => {
 		].join('\n');
 
 		assert.deepStrictEqual(profile.parseAllPorts(stdout), [
-			{ command: 'Unknown', pid: '50324', port: '8080', type: 'TCP LISTENING' },
-			{ command: 'Unknown', pid: '83903', port: '50100', type: 'TCP ESTABLISHED' },
-			{ command: 'Unknown', pid: '200', port: '5353', type: 'UDP' }
+			{ command: 'Unknown', pid: '50324', port: '8080', type: 'TCP LISTENING', localAddress: '0.0.0.0:8080', listenAddress: '0.0.0.0' },
+			{ command: 'Unknown', pid: '83903', port: '50100', type: 'TCP ESTABLISHED', localAddress: '127.0.0.1:50100', listenAddress: '' },
+			{ command: 'Unknown', pid: '200', port: '5353', type: 'UDP', localAddress: '0.0.0.0:5353', listenAddress: '' }
 		]);
 	});
 

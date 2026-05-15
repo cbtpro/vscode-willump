@@ -17,7 +17,7 @@ interface WebviewMessage {
 	message?: string;
 }
 
-type PortColumnKey = 'port' | 'type' | 'pid' | 'command';
+type PortColumnKey = 'port' | 'type' | 'localAddress' | 'listenAddress' | 'pid' | 'command';
 type ProcessColumnKey = 'command' | 'pid' | 'ports' | 'protocols' | 'connectionCount';
 type SortDirection = 'asc' | 'desc' | '';
 type PortViewMode = 'connections' | 'processes';
@@ -49,7 +49,7 @@ const isKilling = ref(false);
 const errorMessage = ref('');
 const successMessage = ref('');
 const pendingKill = ref<KillTarget | null>(null);
-const visibleColumnKeys = ref<PortColumnKey[]>(['port', 'type', 'pid', 'command']);
+const visibleColumnKeys = ref<PortColumnKey[]>(['port', 'type', 'localAddress', 'listenAddress', 'pid', 'command']);
 const visibleProcessColumnKeys = ref<ProcessColumnKey[]>(['command', 'pid', 'ports', 'protocols', 'connectionCount']);
 const sortState = ref<{ key: PortColumnKey; direction: SortDirection }>({
 	key: 'port',
@@ -76,7 +76,7 @@ const filteredPorts = computed(() => {
 	}
 
 	return ports.value.filter(item =>
-		[item.port, item.pid, item.command, item.type].some(field => field.toLowerCase().includes(value))
+		[item.port, item.pid, item.command, item.type, item.localAddress, item.listenAddress].some(field => field.toLowerCase().includes(value))
 	);
 });
 
@@ -99,6 +99,8 @@ const filteredCount = computed(() => (viewMode.value === 'processes' ? filteredP
 const portColumns = computed<Array<{ key: PortColumnKey; title: string; width?: number }>>(() => [
 	{ key: 'port', title: t('ports.port'), width: 110 },
 	{ key: 'type', title: t('ports.type'), width: 160 },
+	{ key: 'localAddress', title: t('ports.localAddress'), width: 220 },
+	{ key: 'listenAddress', title: t('ports.listenAddress'), width: 180 },
 	{ key: 'pid', title: t('ports.pid'), width: 120 },
 	{ key: 'command', title: t('ports.command') }
 ]);
@@ -114,7 +116,7 @@ const visibleProcessColumns = computed(() => processColumns.value.filter(column 
 const tableRows = computed(() =>
 	sortPorts(filteredPorts.value).map(item => ({
 		...item,
-		rowId: `${item.type}-${item.port}-${item.pid}-${item.command}`
+		rowId: `${item.type}-${item.localAddress}-${item.port}-${item.pid}-${item.command}`
 	}))
 );
 const processTableRows = computed(() => sortProcessRows(filteredProcessRows.value));
@@ -442,7 +444,7 @@ onUnmounted(() => {
 			:loading="isRefreshing"
 			:pagination="false"
 			:bordered="{ cell: true }"
-			:scroll="{ x: 620 }"
+			:scroll="{ x: 960 }"
 			row-key="rowId"
 		>
 			<template #columns>

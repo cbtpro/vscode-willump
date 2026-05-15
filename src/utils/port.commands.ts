@@ -3,6 +3,8 @@ export interface PortInfo {
 	pid: string;
 	command: string;
 	type: string;
+	localAddress: string;
+	listenAddress: string;
 }
 
 export type PortScanMode = 'listening' | 'all';
@@ -84,7 +86,9 @@ const windowsProfile: PortCommandProfile = {
 				command: 'Unknown',
 				pid: parts?.pid ?? '',
 				port: parts?.port ?? '',
-				type: getConnectionType(parts?.protocol ?? '', parts?.state)
+				type: getConnectionType(parts?.protocol ?? '', parts?.state),
+				localAddress: parts?.localAddress ?? '',
+				listenAddress: getListenAddress(parts?.localAddress ?? '', parts?.state)
 			}));
 
 		return uniquePorts(ports);
@@ -98,7 +102,9 @@ const windowsProfile: PortCommandProfile = {
 				command: 'Unknown',
 				pid: parts?.pid ?? '',
 				port: parts?.port ?? '',
-				type: getConnectionType(parts?.protocol ?? '', parts?.state)
+				type: getConnectionType(parts?.protocol ?? '', parts?.state),
+				localAddress: parts?.localAddress ?? '',
+				listenAddress: getListenAddress(parts?.localAddress ?? '', parts?.state)
 			}));
 
 		return uniquePorts(ports);
@@ -160,16 +166,8 @@ const posixProfile: PortCommandProfile = {
 		const ports = stdout
 			.split('\n')
 			.slice(1)
-			.map(line => line.trim().split(/\s+/))
-			.filter(parts => parts.length > 8)
-			.map(parts => ({
-				command: parts[0],
-				pid: parts[1],
-				port: getPortFromAddress(parts[8]),
-				name: parts.slice(8).join(' ')
-			}))
-			.filter(item => item.port && item.name.includes('(LISTEN)'))
-			.map(({ command, pid, port }) => ({ command, pid, port, type: 'TCP LISTEN' }));
+			.map(parsePosixLsofLine)
+			.filter((item): item is PortInfo => Boolean(item && item.port && item.type === 'TCP LISTEN'));
 
 		return uniquePorts(ports);
 	},
@@ -205,7 +203,7 @@ function getPortFromAddress(address: string): string {
 	return match?.[1] ?? '';
 }
 
-function parseWindowsNetstatLine(line: string): { protocol: string; port: string; state: string; pid: string } | undefined {
+function parseWindowsNetstatLine(line: string): { protocol: string; port: string; state: string; pid: string; localAddress: string } | undefined {
 	const parts = line.trim().split(/\s+/);
 	const protocol = parts[0]?.toUpperCase();
 
@@ -225,7 +223,8 @@ function parseWindowsNetstatLine(line: string): { protocol: string; port: string
 		protocol,
 		port: getPortFromAddress(localAddress),
 		state,
-		pid
+		pid,
+		localAddress
 	};
 }
 
@@ -298,7 +297,9 @@ function parsePosixLsofLine(line: string): PortInfo | undefined {
 		command,
 		pid,
 		port,
-		type: getConnectionType(protocol, getPosixConnectionState(name))
+		type: getConnectionType(protocol, getPosixConnectionState(name)),
+		localAddress,
+		listenAddress: getListenAddress(localAddress, getPosixConnectionState(name))
 	};
 }
 
@@ -310,6 +311,21 @@ function getPosixConnectionState(name: string): string {
 	return name.match(/\(([^)]+)\)$/)?.[1] ?? '';
 }
 
+function getListenAddress(localAddress: string, state?: string): string {
+	return state === 'LISTEN' || state === 'LISTENING' ? getHostFromAddress(localAddress) : '';
+}
+
+function getHostFromAddress(address: string): string {
+	const value = address.trim();
+	const bracketed = value.match(/^(\[[^\]]+\]):\d+$/);
+
+	if (bracketed) {
+		return bracketed[1];
+	}
+
+	return value.replace(/:\d+$/, '');
+}
+
 function unique(values: string[]): string[] {
 	return Array.from(new Set(values));
 }
@@ -318,7 +334,7 @@ function uniquePorts(ports: PortInfo[]): PortInfo[] {
 	const seen = new Set<string>();
 
 	return ports.filter(item => {
-		const key = `${item.type}-${item.port}-${item.pid}-${item.command}`;
+		const key = `${item.type}-${item.localAddress}-${item.port}-${item.pid}-${item.command}`;
 
 		if (seen.has(key)) {
 			return false;
