@@ -6,11 +6,6 @@ import { computed, toRef } from 'vue';
 import useTableSort from '../../composables/useTableSort';
 import ColumnSettingsDropdown from './ColumnSettingsDropdown.vue';
 import { t } from '../../i18n';
-import IconSortAscending from '@arco-design/web-vue/es/icon/icon-sort-ascending';
-import IconSortDescending from '@arco-design/web-vue/es/icon/icon-sort-descending';
-import { computed, toRef } from 'vue';
-import useTableSort from '../../composables/useTableSort';
-import { t } from '../../i18n';
 import type { PortTableColumn, PortTableRow, PortViewMode, SortDirection } from './ports.types';
 
 const props = defineProps<{

@@ -1,4 +1,11 @@
 <script setup lang="ts">
+import { t } from '../i18n';
+import PageHeader from '../components/common/PageHeader.vue';
+import StatusAlerts from '../components/common/StatusAlerts.vue';
+import FullCommandModal from '../components/ports/FullCommandModal.vue';
+import PortKillConfirmModal from '../components/ports/PortKillConfirmModal.vue';
+import PortsSummaryBar from '../components/ports/PortsSummaryBar.vue';
+import PortsTable from '../components/ports/PortsTable.vue';
 import usePorts from '../composables/usePorts';
 
 const {
