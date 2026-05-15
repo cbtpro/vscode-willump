@@ -3,7 +3,8 @@ import IconSettings from '@arco-design/web-vue/es/icon/icon-settings';
 import IconSort from '@arco-design/web-vue/es/icon/icon-sort';
 import IconSortAscending from '@arco-design/web-vue/es/icon/icon-sort-ascending';
 import IconSortDescending from '@arco-design/web-vue/es/icon/icon-sort-descending';
-import { computed } from 'vue';
+import { computed, toRef } from 'vue';
+import useTableSort from '../../composables/useTableSort';
 import { t } from '../../i18n';
 import type { PortTableColumn, PortTableRow, PortViewMode, SortDirection } from './ports.types';
 
@@ -34,13 +35,7 @@ const emptyDescription = computed(() => {
 	return props.mode === 'processes' ? t('ports.noProcessData') : t('ports.empty');
 });
 
-function getSortIcon(key: string) {
-	if (props.sortKey !== key || !props.sortDirection) {
-		return IconSort;
-	}
-
-	return props.sortDirection === 'asc' ? IconSortAscending : IconSortDescending;
-}
+const { getSortIcon } = useTableSort(toRef(props, 'sortKey'), toRef(props, 'sortDirection'));
 
 function isColumnVisible(key: string) {
 	return props.columns.some(column => column.key === key);
