@@ -37,6 +37,8 @@
     "empty": "No port data",
     "filterCount": "Filtered",
     "kill": "Terminate",
+    "view": "View",
+    "viewFullCommand": "View full command",
     "killFailed": "Failed to terminate process",
     "killSuccess": "Terminated process {pid} on port {port}",
     "listenAddress": "Listen Address",

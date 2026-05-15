@@ -37,6 +37,8 @@
     "empty": "暂无端口数据",
     "filterCount": "筛选结果",
     "kill": "终止",
+    "view": "查看",
+    "viewFullCommand": "查看完整命令",
     "killFailed": "终止进程失败",
     "killSuccess": "已终止端口 {port} 的进程 {pid}",
     "listenAddress": "监听地址",
