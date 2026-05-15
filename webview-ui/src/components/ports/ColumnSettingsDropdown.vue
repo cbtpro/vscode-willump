@@ -43,5 +43,13 @@ function isColumnVisible(key: string) {
   max-height: 320px;
   overflow: auto;
   padding: 8px;
+  min-width: 200px;
+  border-radius: 6px;
+}
+
+/* make each checkbox occupy full line for easier tapping */
+.column-menu .arco-checkbox {
+  display: block;
+  margin: 6px 0;
 }
 </style>
