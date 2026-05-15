@@ -506,7 +506,7 @@ onUnmounted(() => {
 					</template>
 					<template #cell="{ record }">
 						<a-space>
-							<a-button v-if="record.commandFull && record.commandFull !== record.command" type="text" size="small" @click="openFullCommand(record.commandFull)">
+							<a-button v-if="record.commandFull && (record.commandFull.trim() !== (record.command || '').trim() || record.commandFull.length > 50)" type="text" size="small" @click="openFullCommand(record.commandFull)">
 								{{ t('ports.view') }}
 							</a-button>
 							<a-button type="text" status="danger" size="small" :disabled="isKilling" @click="openKillConfirm(record)">
@@ -564,7 +564,7 @@ onUnmounted(() => {
 					</template>
 					<template #cell="{ record }">
 						<a-space>
-							<a-button v-if="record.commandFull && record.commandFull !== record.command" type="text" size="small" @click="openFullCommand(record.commandFull)">
+							<a-button v-if="record.commandFull && (record.commandFull.trim() !== (record.command || '').trim() || record.commandFull.length > 50)" type="text" size="small" @click="openFullCommand(record.commandFull)">
 								{{ t('ports.view') }}
 							</a-button>
 							<a-button
