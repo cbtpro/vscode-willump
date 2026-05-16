@@ -15,7 +15,7 @@ jobs:
       - name: Use Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '20.19.x'
       - name: Cache node modules
         uses: actions/cache@v4
         with:
@@ -38,13 +38,12 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        node: [18, 20]
     steps:
       - uses: actions/checkout@v4
       - name: Use Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: ${{ matrix.node }}
+          node-version: '20.19.x'
       - name: Cache node modules
         uses: actions/cache@v4
         with:
@@ -57,6 +56,12 @@ jobs:
       - name: Compile extension and webview
         run: npm run compile
       - name: Run integration tests (VS Code)
+        if: runner.os != 'Linux'
         env:
           CI: true
         run: npm test
+      - name: Run integration tests (VS Code on Linux)
+        if: runner.os == 'Linux'
+        env:
+          CI: true
+        run: xvfb-run -a npm test

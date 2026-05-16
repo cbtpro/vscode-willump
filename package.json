@@ -68,7 +68,6 @@
     "url": "https://github.com/cbtpro"
   },
   "scripts": {
-    "preinstall": "npm install -g vsce",
     "vscode:prepublish": "npm run compile",
     "package": "vsce package",
     "compile": "npm run compile:webview && tsc -p ./",
