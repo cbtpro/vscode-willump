@@ -31,7 +31,7 @@ function saveGlobal() {
 		<a-card class="config-panel" :title="t('git.currentProjectConfig')" :bordered="false">
 			<p>{{ t('git.identityPreview') }}: {{ props.config?.effectiveIdentity.name || '-' }} &lt;{{ props.config?.effectiveIdentity.email || '-' }}&gt;</p>
 			<p>{{ t('git.identitySource') }}: {{ props.config?.effectiveIdentity.source || '-' }}</p>
-			<a-alert :type="props.config?.effectiveIdentity.isGithubNoreply ? 'success' : 'warning'">{{ props.config?.effectiveIdentity.isGithubNoreply ? t('git.noreplyDetected') : t('git.noreplyTip') }}</a-alert>
+			<a-alert show-icon :type="props.config?.effectiveIdentity.isGithubNoreply ? 'success' : 'warning'">{{ props.config?.effectiveIdentity.isGithubNoreply ? t('git.noreplyDetected') : t('git.noreplyTip') }}</a-alert>
 			<a-form :model="props.form.local" layout="vertical">
 				<a-form-item :label="t('git.author')">
 					<a-input v-model="props.form.local.name" placeholder="user.name" :disabled="!props.form.local.available" />

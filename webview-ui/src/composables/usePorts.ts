@@ -2,7 +2,6 @@
 import { t } from '../i18n';
 import { getVsCodeApi, type PortInfo, type PortScanMode } from '../vscode';
 import type {
-  KillTarget,
   NetworkProcessRow,
   PortColumnKey,
   PortConnectionRow,
@@ -26,7 +25,6 @@ export default function usePorts() {
   const isKilling = ref(false);
   const errorMessage = ref('');
   const successMessage = ref('');
-  const pendingKill = ref<KillTarget | null>(null);
   const isFullCommandVisible = ref(false);
   const fullCommandText = ref('');
 
@@ -37,15 +35,6 @@ export default function usePorts() {
   const visibleProcessColumnKeys = processTableColumns.visibleKeys;
   const sortState = ref<{ key: PortColumnKey; direction: SortDirection }>({ key: 'port', direction: '' });
   const processSortState = ref<{ key: ProcessColumnKey; direction: SortDirection }>({ key: 'connectionCount', direction: 'desc' });
-
-  const isKillConfirmVisible = computed({
-    get: () => Boolean(pendingKill.value),
-    set: visible => {
-      if (!visible) {
-        closeKillConfirm();
-      }
-    }
-  });
 
   const filteredPorts = computed(() => {
     const value = keyword.value.trim().toLowerCase();
@@ -282,26 +271,20 @@ export default function usePorts() {
   }
 
 
-  function openKillConfirm(item: KillTarget) {
+  function handleKill(record: PortTableRow) {
+    killPort('ports' in record ? record.ports || '-' : record.port, record.pid);
+  }
+
+  function killPort(port: string, pid: string) {
     errorMessage.value = '';
     successMessage.value = '';
-    pendingKill.value = item;
-  }
-
-  function handleKill(record: PortTableRow) {
-    openKillConfirm({
-      port: 'ports' in record ? record.ports || '-' : record.port,
-      pid: record.pid,
-      command: record.command
+    isKilling.value = true;
+    vscode?.postMessage({
+      type: 'killPort',
+      port,
+      pid,
+      mode: scanMode.value
     });
-  }
-
-  function closeKillConfirm() {
-    if (isKilling.value) {
-      return;
-    }
-
-    pendingKill.value = null;
   }
 
   function openFullCommand(command?: string) {
@@ -314,22 +297,6 @@ export default function usePorts() {
     if (!visible) {
       fullCommandText.value = '';
     }
-  }
-
-  function confirmKillPort() {
-    if (!pendingKill.value) {
-      return;
-    }
-
-    isKilling.value = true;
-    errorMessage.value = '';
-    successMessage.value = '';
-    vscode?.postMessage({
-      type: 'killPort',
-      port: pendingKill.value.port,
-      pid: pendingKill.value.pid,
-      mode: scanMode.value
-    });
   }
 
   function handleMessage(event: MessageEvent) {
@@ -348,7 +315,6 @@ export default function usePorts() {
 
       if (message.success) {
         successMessage.value = t('ports.killSuccess', { port: message.port ?? '', pid: message.pid ?? '' });
-        pendingKill.value = null;
         return;
       }
 
@@ -384,14 +350,12 @@ export default function usePorts() {
     isKilling,
     errorMessage,
     successMessage,
-    pendingKill,
     isFullCommandVisible,
     fullCommandText,
     visibleColumnKeys,
     visibleProcessColumnKeys,
     sortState,
     processSortState,
-    isKillConfirmVisible,
     filteredPorts,
     hasKeyword,
     processRows,
@@ -425,12 +389,9 @@ export default function usePorts() {
     togglePortSort,
     toggleProcessSort,
     toggleVisibleColumn,
-    openKillConfirm,
     handleKill,
-    closeKillConfirm,
     openFullCommand,
     handleFullCommandVisibleChange,
-    confirmKillPort,
     handleMessage
   };
 }

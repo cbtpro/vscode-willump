@@ -35,14 +35,15 @@ const emptyDescription = computed(() => {
 	return props.mode === 'processes' ? t('ports.noProcessData') : t('ports.empty');
 });
 
+const killOkButtonProps = { type: 'primary' as const, status: 'danger' as const };
 const { getSortIcon } = useTableSort(toRef(props, 'sortKey'), toRef(props, 'sortDirection'));
-
-function isColumnVisible(key: string) {
-	return props.columns.some(column => column.key === key);
-}
 
 function isKillDisabled(record: PortTableRow) {
 	return props.isKilling || (props.mode === 'processes' && !/^\d+$/.test(record.pid));
+}
+
+function getKillPort(record: PortTableRow) {
+	return 'ports' in record ? record.ports || '-' : record.port;
 }
 </script>
 
@@ -69,7 +70,27 @@ function isKillDisabled(record: PortTableRow) {
 						<a-button v-if="record.commandFull" type="text" size="small" @click="emit('view-command', record.commandFull)">
 							{{ t('ports.view') }}
 						</a-button>
-						<a-button type="text" status="danger" size="small" :disabled="isKillDisabled(record)" @click="emit('kill', record)">
+						<a-popconfirm
+							v-if="!isKillDisabled(record)"
+							type="warning"
+							position="left"
+							:ok-text="t('ports.confirmKill')"
+							:cancel-text="t('common.cancel')"
+							:ok-button-props="killOkButtonProps"
+							@ok="emit('kill', record)"
+						>
+							<template #content>
+								<div class="kill-confirm-content">
+									<strong>{{ t('ports.confirmKillTitle') }}</strong>
+									<p>{{ t('ports.confirmKillDescription') }}</p>
+									<p>{{ t('ports.port') }}: {{ getKillPort(record) }} / {{ t('ports.pid') }}: {{ record.pid }}</p>
+								</div>
+							</template>
+							<a-button type="text" status="danger" size="small">
+								{{ t('ports.kill') }}
+							</a-button>
+						</a-popconfirm>
+						<a-button v-else type="text" status="danger" size="small" disabled>
 							{{ t('ports.kill') }}
 						</a-button>
 					</a-space>
@@ -85,5 +106,13 @@ function isKillDisabled(record: PortTableRow) {
 <style scoped>
 .table-action-header a-button {
 	margin-left: 4px;
+}
+
+.kill-confirm-content {
+	max-width: 280px;
+}
+
+.kill-confirm-content p {
+	margin: 4px 0 0;
 }
 </style>

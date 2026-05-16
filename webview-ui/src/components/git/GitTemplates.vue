@@ -38,7 +38,12 @@ const emit = defineEmits<{
 				<a-space>
 					<a-button size="small" @click="$emit('apply-template', template, 'local')">{{ t('git.applyLocal') }}</a-button>
 					<a-button size="small" @click="$emit('apply-template', template, 'global')">{{ t('git.applyGlobal') }}</a-button>
-					<a-button size="small" status="danger" @click="$emit('remove-template', index)">{{ t('common.delete') }}</a-button>
+					<a-popconfirm type="warning" position="left" :ok-text="t('common.delete')" :cancel-text="t('common.cancel')" @ok="$emit('remove-template', index)">
+						<template #content>
+							{{ t('common.delete') }} {{ template.name }}?
+						</template>
+						<a-button size="small" status="danger">{{ t('common.delete') }}</a-button>
+					</a-popconfirm>
 				</a-space>
 			</div>
 		</a-card>

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import IconCheck from '@arco-design/web-vue/es/icon/icon-check';
 import IconCopy from '@arco-design/web-vue/es/icon/icon-copy';
+import { Message } from '@arco-design/web-vue';
 import { computed, onUnmounted, ref, watch } from 'vue';
 import { t } from '../../i18n';
 
@@ -29,17 +30,6 @@ const visibleModel = computed({
 
 		closeModal();
 	}
-});
-const copyFeedback = computed(() => {
-	if (copyState.value === 'success') {
-		return { type: 'success' as const, content: t('ports.copySuccess') };
-	}
-
-	if (copyState.value === 'error') {
-		return { type: 'error' as const, content: t('ports.copyFailed') };
-	}
-
-	return null;
 });
 const copyButtonText = computed(() => {
 	if (isCopying.value) {
@@ -108,8 +98,16 @@ async function copyCommand() {
 
 		await navigator.clipboard.writeText(props.command || '');
 		copyState.value = 'success';
+		Message.success({
+			id: 'full-command-copy',
+			content: t('ports.copySuccess')
+		});
 	} catch (err) {
 		copyState.value = 'error';
+		Message.error({
+			id: 'full-command-copy',
+			content: t('ports.copyFailed')
+		});
 	} finally {
 		isCopying.value = false;
 		scheduleCopyFeedbackReset();
@@ -125,9 +123,6 @@ onUnmounted(() => {
 	<a-modal v-model:visible="visibleModel" :title="t('ports.startCommand')" :footer="false" :mask-closable="!isCopying">
 		<div class="full-command-modal">
 			<pre class="full-command-content">{{ command }}</pre>
-			<a-alert v-if="copyFeedback" class="full-command-feedback" :type="copyFeedback.type">
-				{{ copyFeedback.content }}
-			</a-alert>
 			<div class="dialog-actions">
 				<a-button :disabled="isCopying" @click="closeModal">{{ t('common.close') }}</a-button>
 				<a-button type="primary" :status="copyState === 'success' ? 'success' : 'normal'" :loading="isCopying" @click="copyCommand">
@@ -160,9 +155,5 @@ onUnmounted(() => {
 	border-radius: 6px;
 	background: var(--color-fill-2);
 	color: var(--color-text-1);
-}
-
-.full-command-feedback {
-	margin: 0;
 }
 </style>

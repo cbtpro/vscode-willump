@@ -12,7 +12,6 @@
     "Other"
   ],
   "activationEvents": [
-    "onView:willump.featuresView"
   ],
   "main": "./out/extension.js",
   "contributes": {

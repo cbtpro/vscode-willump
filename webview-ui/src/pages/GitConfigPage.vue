@@ -9,7 +9,7 @@ import GitRemote from '../components/git/GitRemote.vue';
 import GitPolicy from '../components/git/GitPolicy.vue';
 import GitSystem from '../components/git/GitSystem.vue';
 import PageHeader from '../components/common/PageHeader.vue';
-import StatusAlerts from '../components/common/StatusAlerts.vue';
+import useStatusNotifications from '../composables/useStatusNotifications';
 
 interface GitMessage {
 	type: 'gitConfigUpdated' | 'gitConfigSaved';
@@ -56,6 +56,12 @@ const generatedNoreplyEmail = computed(() => {
 const workspaceRows = computed(() => config.value?.workspaces ?? []);
 const remoteRows = computed(() => config.value?.remote.remotes ?? []);
 const hookRows = computed(() => config.value?.hooks ?? []);
+
+useStatusNotifications({
+	title: () => t('git.title'),
+	successMessage,
+	errorMessage
+});
 
 function createEmptyScope(): GitConfigScope {
 	return {
@@ -197,8 +203,6 @@ onUnmounted(() => {
 <template>
 	<main class="page">
 		<PageHeader :title="t('git.title')" :subtitle="t('git.subtitle')" :action-label="t('common.refresh')" :loading="isLoading" @action="refreshGitConfig" />
-
-		<StatusAlerts :success-message="successMessage" :error-message="errorMessage" />
 
 		<a-collapse :default-active-key="[]">
 			<a-collapse-item key="overview" :header="t('git.sections.overview')">

@@ -1,7 +1,7 @@
-import { ref } from 'vue';
+import { shallowRef } from 'vue';
 
 export default function useTableColumns<T extends string>(initial: T[], minVisible = 1) {
-  const visibleKeys = ref<T[]>([...initial]);
+  const visibleKeys = shallowRef<T[]>([...initial]);
 
   function isColumnVisible(key: T) {
     return visibleKeys.value.includes(key);

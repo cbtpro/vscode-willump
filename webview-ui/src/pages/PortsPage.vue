@@ -1,12 +1,11 @@
 <script setup lang="ts">
 import { t } from '../i18n';
 import PageHeader from '../components/common/PageHeader.vue';
-import StatusAlerts from '../components/common/StatusAlerts.vue';
 import FullCommandModal from '../components/ports/FullCommandModal.vue';
-import PortKillConfirmModal from '../components/ports/PortKillConfirmModal.vue';
 import PortsSummaryBar from '../components/ports/PortsSummaryBar.vue';
 import PortsTable from '../components/ports/PortsTable.vue';
 import usePorts from '../composables/usePorts';
+import useStatusNotifications from '../composables/useStatusNotifications';
 
 const {
 	ports,
@@ -17,14 +16,12 @@ const {
 	isKilling,
 	errorMessage,
 	successMessage,
-	pendingKill,
 	isFullCommandVisible,
 	fullCommandText,
 	visibleColumnKeys,
 	visibleProcessColumnKeys,
 	sortState,
 	processSortState,
-	isKillConfirmVisible,
 	filteredPorts,
 	hasKeyword,
 	processRows,
@@ -50,10 +47,14 @@ const {
 	toggleVisibleColumn,
 	openFullCommand,
 	handleFullCommandVisibleChange,
-	handleKill,
-	confirmKillPort,
-	closeKillConfirm
+	handleKill
 } = usePorts();
+
+useStatusNotifications({
+	title: () => t('ports.title'),
+	successMessage,
+	errorMessage
+});
 </script>
 
 <template>
@@ -71,8 +72,6 @@ const {
 			@change-view-mode="handleViewModeChange"
 		/>
 
-		<StatusAlerts :success-message="successMessage" :error-message="errorMessage" />
-
 		<PortsTable
 			:mode="viewMode"
 			:rows="activeRows"
@@ -89,7 +88,6 @@ const {
 			@kill="handleKill"
 		/>
 
-		<PortKillConfirmModal v-model:visible="isKillConfirmVisible" :target="pendingKill" :is-killing="isKilling" @confirm="confirmKillPort" />
 		<FullCommandModal :visible="isFullCommandVisible" :command="fullCommandText" @update:visible="handleFullCommandVisibleChange" />
 	</main>
 </template>
