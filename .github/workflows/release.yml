@@ -1,0 +1,84 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing tag to release, for example v0.0.5'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build VSIX and create release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve release tag
+        id: release-tag
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "tag=${{ inputs.tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.release-tag.outputs.tag }}
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.19.x'
+
+      - name: Cache node modules
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify tag matches package version
+        run: |
+          PACKAGE_VERSION="$(node -p "require('./package.json').version")"
+          TAG_VERSION="${{ steps.release-tag.outputs.tag }}"
+          TAG_VERSION="${TAG_VERSION#v}"
+          if [ "$PACKAGE_VERSION" != "$TAG_VERSION" ]; then
+            echo "Tag version v$TAG_VERSION does not match package.json version $PACKAGE_VERSION."
+            exit 1
+          fi
+
+      - name: Run checks
+        run: |
+          npm run lint
+          npm run test:unit
+
+      - name: Package VSIX
+        run: npm run package -- --out willump-${{ steps.release-tag.outputs.tag }}.vsix
+
+      - name: Upload VSIX artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: willump-${{ steps.release-tag.outputs.tag }}
+          path: willump-${{ steps.release-tag.outputs.tag }}.vsix
+          if-no-files-found: error
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ steps.release-tag.outputs.tag }}" \
+            "willump-${{ steps.release-tag.outputs.tag }}.vsix" \
+            --title "${{ steps.release-tag.outputs.tag }}" \
+            --generate-notes \
+            --verify-tag

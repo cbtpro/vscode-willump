@@ -122,6 +122,94 @@ This document is the default quickstart guide generated for a VS Code extension 
 
   * 你可以在 `test` 目录中创建子目录，用自己喜欢的方式组织测试文件。
 
+## Package and release
+
+## 打包与发布
+
+### Local package
+
+### 本地打包
+
+1. Install dependencies:
+
+1. 安装依赖：
+
+```bash
+npm ci
+```
+
+2. Run the required checks:
+
+2. 运行必要检查：
+
+```bash
+npm run lint
+npm run test:unit
+```
+
+3. Build and package the extension:
+
+3. 构建并打包扩展：
+
+```bash
+npm run package
+```
+
+The command runs `vscode:prepublish` first, so it will compile the extension code and Webview assets before creating the `.vsix` file. The packaged file is named from `package.json`, for example `willump-0.0.5.vsix`.
+
+该命令会先执行 `vscode:prepublish`，因此会在生成 `.vsix` 文件前编译扩展代码和 Webview 资源。生成的包名来自 `package.json`，例如 `willump-0.0.5.vsix`。
+
+### Package contents
+
+### 打包内容
+
+The published VSIX is controlled by `.vscodeignore`. Keep source files, tests, repository maintenance files, and local development folders out of the final package. The package should keep only runtime files such as:
+
+发布包内容由 `.vscodeignore` 控制。源码、测试、仓库维护文件和本地开发目录不应进入最终包。发布包应主要保留运行时所需文件，例如：
+
+* `package.json`
+* `package.nls.json`
+* `package.nls.zh-cn.json`
+* `README.md`
+* `CHANGELOG.md`
+* `LICENSE.md`
+* `assets/**`
+* `dist/webview/**`
+* `out/**`
+
+Before changing `.vscodeignore`, verify the package once with:
+
+修改 `.vscodeignore` 后，先用下面的命令确认包内容：
+
+```bash
+npm run package -- --out /tmp/willump-package-check.vsix
+```
+
+### GitHub release workflow
+
+### GitHub Release 流水线
+
+Release automation is defined in `.github/workflows/release.yml`. It supports two ways to publish:
+
+发布自动化定义在 `.github/workflows/release.yml`，支持两种发布方式：
+
+1. Push a version tag:
+
+1. 推送版本标签：
+
+```bash
+git tag v0.0.5
+git push origin v0.0.5
+```
+
+2. Run the `Release` workflow manually in GitHub Actions and provide an existing tag, for example `v0.0.5`.
+
+2. 在 GitHub Actions 中手动运行 `Release` workflow，并填写一个已经存在的标签，例如 `v0.0.5`。
+
+The workflow checks that the tag version matches `package.json`. For example, tag `v0.0.5` must match `"version": "0.0.5"`. After the checks pass, the workflow packages the VSIX, uploads it as an Actions artifact, and attaches it to a GitHub Release.
+
+流水线会校验标签版本和 `package.json` 是否一致。例如，标签 `v0.0.5` 必须对应 `"version": "0.0.5"`。检查通过后，流水线会打包 VSIX，上传为 Actions artifact，并附加到 GitHub Release。
+
 ## Go further
 
 ## 继续深入
