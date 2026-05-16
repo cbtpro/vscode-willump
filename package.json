@@ -2,7 +2,7 @@
   "name": "willump",
   "displayName": "willump",
   "description": "%extension.description%",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "publisher": "cbtpro",
   "icon": "assets/icon.png",
   "engines": {
