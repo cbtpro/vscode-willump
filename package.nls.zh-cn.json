@@ -5,5 +5,6 @@
   "command.killPort.title": "Willump: 终止占用端口的进程",
   "command.listPorts.title": "Willump: 查看所有端口占用情况",
   "command.viewPorts.title": "Willump: 查看端口占用",
-  "command.viewGitConfig.title": "Willump: 查看 Git 开发配置"
+  "command.viewGitConfig.title": "Willump: 查看 Git 开发配置",
+  "command.viewSystemInfo.title": "Willump: 查看本机信息"
 }

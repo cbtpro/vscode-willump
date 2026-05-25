@@ -19,6 +19,7 @@ export enum Commands {
 	 * 查看 Git 开发配置。
 	 */
 	VIEW_GIT_CONFIG = 'willump.viewGitConfig',
+	VIEW_SYSTEM_INFO = 'willump.viewSystemInfo',
 	/**
 	 * 打开端口占用情况。
 	 */

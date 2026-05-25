@@ -12,6 +12,9 @@ const messages = {
 		'feature.ports.description': '查看 / 搜索 / 终止',
 		'feature.ports.open': '打开端口占用视图',
 		'feature.ports.title': '端口占用',
+		'feature.system.description': '计算机 / 网络 / 硬件',
+		'feature.system.open': '打开本机信息',
+		'feature.system.title': '本机信息',
 		'git.loadFailed': '读取 Git 配置失败',
 		'git.noWorkspace': '当前没有打开工作区，无法读取项目 Git 配置',
 		'git.saveFailed': '保存 Git 配置失败',
@@ -27,7 +30,9 @@ const messages = {
 		'port.kill.success': '已终止端口 {port} 的进程 {pid}',
 		'port.killResult.failed': '终止进程失败',
 		'port.list.failed': '获取端口数据失败',
-		'port.output.title': '当前占用端口：'
+		'port.output.title': '当前占用端口：',
+		'system.loadFailed': '获取本机信息失败',
+		'system.title': '本机信息'
 	},
 	'en-US': {
 		'command.checkPort.prompt': 'Enter ports to check, separated by spaces. Example: 3000 8080',
@@ -40,6 +45,9 @@ const messages = {
 		'feature.ports.description': 'View / search / terminate',
 		'feature.ports.open': 'Open ports view',
 		'feature.ports.title': 'Ports',
+		'feature.system.description': 'Computer / network / hardware',
+		'feature.system.open': 'Open system info',
+		'feature.system.title': 'System Info',
 		'git.loadFailed': 'Failed to read Git config',
 		'git.noWorkspace': 'No workspace is open, so project Git config cannot be read.',
 		'git.saveFailed': 'Failed to save Git config',
@@ -55,7 +63,9 @@ const messages = {
 		'port.kill.success': 'Terminated process {pid} on port {port}',
 		'port.killResult.failed': 'Failed to terminate process',
 		'port.list.failed': 'Failed to load port data',
-		'port.output.title': 'Current occupied ports:'
+		'port.output.title': 'Current occupied ports:',
+		'system.loadFailed': 'Failed to load system info',
+		'system.title': 'System Info'
 	}
 } as const;
 

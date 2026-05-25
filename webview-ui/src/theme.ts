@@ -45,6 +45,7 @@ function applyTheme() {
 	const theme = resolvedTheme.value;
 	document.documentElement.dataset.theme = theme;
 	document.body.classList.toggle('arco-theme-dark', theme === 'dark');
+	document.body.setAttribute('arco-theme', theme === 'dark' ? 'dark' : 'light');
 }
 
 function getStoredThemeMode(): ThemeMode {

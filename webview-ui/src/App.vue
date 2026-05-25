@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import IconDesktop from '@arco-design/web-vue/es/icon/icon-desktop';
+import IconComputer from '@arco-design/web-vue/es/icon/icon-computer';
 import IconLanguage from '@arco-design/web-vue/es/icon/icon-language';
 import IconLink from '@arco-design/web-vue/es/icon/icon-link';
 import IconMoon from '@arco-design/web-vue/es/icon/icon-moon';
@@ -46,7 +47,7 @@ function getThemeIcon(value: string) {
 }
 
 function getRouteIcon(icon: string) {
-	return icon === 'git' ? IconSettings : IconLink;
+	return icon === 'git' ? IconSettings : icon === 'system' ? IconComputer : IconLink;
 }
 
 function openRoute(path: string) {

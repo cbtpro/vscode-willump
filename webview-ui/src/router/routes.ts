@@ -8,6 +8,12 @@ export const routes = [
 		component: defineAsyncComponent(() => import('../pages/PortsPage.vue'))
 	},
 	{
+		path: '/system-info',
+		labelKey: 'nav.systemInfo',
+		icon: 'system',
+		component: defineAsyncComponent(() => import('../pages/SystemInfoPage.vue'))
+	},
+	{
 		path: '/dev-config/git',
 		labelKey: 'nav.gitConfig',
 		icon: 'git',

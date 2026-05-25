@@ -9,13 +9,15 @@ import {
 	killProcessByPid
 } from './utils/common.port';
 import { getGitConfigInfo, updateGitConfig, updateGitSetting } from './utils/git.config';
+import { getSystemInfo, getSystemMemoryInfo } from './utils/system.info';
 import { Commands } from './constants';
 import { localize } from './i18n';
 
 const FEATURES_VIEW_TYPE = 'willump.featuresView';
 const ROUTES = {
 	PORTS: '/ports',
-	GIT_CONFIG: '/dev-config/git'
+	GIT_CONFIG: '/dev-config/git',
+	SYSTEM_INFO: '/system-info'
 } as const;
 let willumpPanel: vscode.WebviewPanel | undefined;
 
@@ -77,6 +79,11 @@ export function activate(context: vscode.ExtensionContext) {
 	context.subscriptions.push(
 		vscode.commands.registerCommand(Commands.VIEW_GIT_CONFIG, async () => {
 			openWillumpWebview(context, localize('git.title'), ROUTES.GIT_CONFIG);
+		})
+	);
+	context.subscriptions.push(
+		vscode.commands.registerCommand(Commands.VIEW_SYSTEM_INFO, async () => {
+			openWillumpWebview(context, localize('system.title'), ROUTES.SYSTEM_INFO);
 		})
 	);
 	context.subscriptions.push(vscode.window.registerTreeDataProvider(FEATURES_VIEW_TYPE, new FeaturesViewProvider()));
@@ -194,6 +201,15 @@ class FeaturesViewProvider implements vscode.TreeDataProvider<FeatureItem> {
 
 		return [
 			new FeatureItem(
+				localize('feature.system.title'),
+				localize('feature.system.description'),
+				'device-desktop',
+				{
+					command: Commands.VIEW_SYSTEM_INFO,
+					title: localize('feature.system.open')
+				}
+			),
+			new FeatureItem(
 				localize('feature.ports.title'),
 				localize('feature.ports.description'),
 				'plug',
@@ -236,6 +252,23 @@ async function handleWebviewMessage(
 			target.webview.postMessage({ type: 'killResult', success: false, message: errorMessage });
 		}
 
+		return;
+	}
+
+	if (message?.type === 'getSystemInfo') {
+		try {
+			const info = await getSystemInfo();
+			target.webview.postMessage({ type: 'systemInfoUpdated', success: true, info });
+		} catch (err) {
+			const errorMessage = err instanceof Error ? err.message : localize('system.loadFailed');
+			target.webview.postMessage({ type: 'systemInfoUpdated', success: false, message: errorMessage });
+		}
+
+		return;
+	}
+
+	if (message?.type === 'getSystemMemoryInfo') {
+		target.webview.postMessage({ type: 'systemMemoryUpdated', success: true, memory: getSystemMemoryInfo() });
 		return;
 	}
 

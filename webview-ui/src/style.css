@@ -328,9 +328,34 @@ p {
 .arco-card-header,
 .arco-modal-header,
 .arco-table-border .arco-table-container,
-.arco-descriptions-bordered .arco-descriptions-item-label,
-.arco-descriptions-bordered .arco-descriptions-item-value {
+.arco-descriptions-border .arco-descriptions-body,
+.arco-descriptions-border .arco-descriptions-row,
+.arco-descriptions-border .arco-descriptions-item,
+.arco-descriptions-border .arco-descriptions-item-label-block,
+.arco-descriptions-border .arco-descriptions-item-value-block {
 	border-color: var(--willump-border);
+}
+
+.arco-descriptions-item-label,
+.arco-descriptions-item-label-block,
+.arco-descriptions-item-label-inline {
+	color: var(--willump-text-muted);
+}
+
+.arco-descriptions-item-value,
+.arco-descriptions-item-value-block,
+.arco-descriptions-item-value-inline,
+.arco-table-th,
+.arco-table-td {
+	color: var(--willump-text);
+}
+
+.arco-descriptions-border .arco-descriptions-item-label-block {
+	background-color: var(--willump-fill-subtle);
+}
+
+.arco-descriptions-border .arco-descriptions-item-value-block {
+	background-color: var(--willump-surface);
 }
 
 .arco-input,

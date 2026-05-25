@@ -11,8 +11,7 @@
   "categories": [
     "Other"
   ],
-  "activationEvents": [
-  ],
+  "activationEvents": [],
   "main": "./out/extension.js",
   "contributes": {
     "viewsContainers": {
@@ -52,6 +51,10 @@
       {
         "command": "willump.viewGitConfig",
         "title": "%command.viewGitConfig.title%"
+      },
+      {
+        "command": "willump.viewSystemInfo",
+        "title": "%command.viewSystemInfo.title%"
       }
     ]
   },
@@ -80,8 +83,9 @@
     "test:unit": "vitest webview-ui/tests --run"
   },
   "devDependencies": {
+    "@types/jest": "^30.0.0",
     "@types/mocha": "^10.0.10",
-    "@types/node": "20.x",
+    "@types/node": "^20.19.41",
     "@types/vscode": "^1.100.0",
     "@typescript-eslint/eslint-plugin": "^8.31.1",
     "@typescript-eslint/parser": "^8.31.1",
@@ -98,6 +102,7 @@
   },
   "dependencies": {
     "@arco-design/web-vue": "^2.57.0",
+    "chart.js": "^4.5.1",
     "vue": "^3.5.34"
   }
 }

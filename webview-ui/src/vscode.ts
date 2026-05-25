@@ -78,6 +78,74 @@ export interface GitWorkspaceOverview {
 	error?: string;
 }
 
+export interface SystemGpuInfo {
+	name: string;
+	memoryBytes?: number;
+	memory?: string;
+	driverVersion?: string;
+	vendor?: string;
+}
+
+export interface SystemNetworkAddress {
+	id: string;
+	interfaceName: string;
+	address: string;
+	family: 'IPv4' | 'IPv6';
+	cidr?: string | null;
+	netmask?: string;
+	mac?: string;
+	scopeid?: number;
+}
+
+export interface PublicIpInfo {
+	address: string;
+	available: boolean;
+	error?: string;
+}
+
+export type DeviceFormFactor = 'laptop' | 'desktop' | 'unknown';
+
+export interface SystemDeviceInfo {
+	formFactor: DeviceFormFactor;
+	manufacturer?: string;
+	model?: string;
+	chassis?: string;
+}
+
+export interface SystemMemoryInfo {
+	totalBytes: number;
+	freeBytes: number;
+	usedBytes: number;
+	usagePercent: number;
+	collectedAt: string;
+}
+
+export interface SystemInfo {
+	hostname: string;
+	platform: string;
+	release: string;
+	arch: string;
+	uptimeSeconds: number;
+	device: SystemDeviceInfo;
+	cpu: {
+		model: string;
+		cores: number;
+		speedMHz: number;
+		architecture: string;
+	};
+	memory: SystemMemoryInfo;
+	gpus: SystemGpuInfo[];
+	network: {
+		localIpv4: SystemNetworkAddress[];
+		localIpv6: SystemNetworkAddress[];
+		publicIpv4: PublicIpInfo;
+		publicIpv6: PublicIpInfo;
+		ipv6Enabled: boolean;
+		ipv6PublicReachable: boolean;
+	};
+	collectedAt: string;
+}
+
 export interface WillumpInitialState {
 	language?: string;
 	route?: string;
