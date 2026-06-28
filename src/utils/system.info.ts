@@ -27,6 +27,20 @@ export interface SystemCpuInfo {
 	cores: number;
 	speedMHz: number;
 	architecture: SystemArchitecture;
+	usage: SystemCpuUsageInfo;
+}
+
+export interface SystemCpuUsageInfo {
+	usagePercent: number;
+	idlePercent: number;
+	cores: SystemCpuCoreUsageInfo[];
+	collectedAt: string;
+}
+
+export interface SystemCpuCoreUsageInfo {
+	index: number;
+	usagePercent: number;
+	idlePercent: number;
 }
 
 export interface SystemGpuInfo {
@@ -158,9 +172,23 @@ interface MacGpuInfoPayload {
 	SPDisplaysDataType?: JsonListInput<MacDisplayPayload>;
 }
 
+interface CpuTimesSnapshot {
+	idle: number;
+	total: number;
+	cores: CpuCoreTimesSnapshot[];
+}
+
+interface CpuCoreTimesSnapshot {
+	idle: number;
+	total: number;
+}
+
+let previousCpuTimesSnapshot: CpuTimesSnapshot | undefined;
+
 export async function getSystemInfo(): Promise<SystemInfo> {
 	const cpuList = os.cpus();
 	const firstCpu = cpuList[0];
+	const cpuUsage = getSystemCpuUsageInfo();
 	const memory = getSystemMemoryInfo();
 	const network = readNetworkAddresses();
 
@@ -182,7 +210,8 @@ export async function getSystemInfo(): Promise<SystemInfo> {
 			model: firstCpu?.model?.trim() ?? '',
 			cores: cpuList.length,
 			speedMHz: firstCpu?.speed ?? 0,
-			architecture: os.arch()
+			architecture: os.arch(),
+			usage: cpuUsage
 		},
 		memory,
 		gpus,
@@ -194,6 +223,30 @@ export async function getSystemInfo(): Promise<SystemInfo> {
 			ipv6Enabled: network.localIpv6.length > 0,
 			ipv6PublicReachable: publicIpv6.available
 		},
+		collectedAt: new Date().toISOString()
+	};
+}
+
+export function getSystemCpuUsageInfo(): SystemCpuUsageInfo {
+	const current = readCpuTimesSnapshot();
+	const previous = previousCpuTimesSnapshot;
+	previousCpuTimesSnapshot = current;
+
+	const usagePercent = calculateCpuUsagePercent(current, previous);
+	const cores = current.cores.map((item, index) => {
+		const coreUsagePercent = calculateCpuUsagePercent(item, previous?.cores[index]);
+
+		return {
+			index,
+			usagePercent: coreUsagePercent,
+			idlePercent: roundPercent(100 - coreUsagePercent)
+		};
+	});
+
+	return {
+		usagePercent,
+		idlePercent: roundPercent(100 - usagePercent),
+		cores,
 		collectedAt: new Date().toISOString()
 	};
 }
@@ -210,6 +263,38 @@ export function getSystemMemoryInfo(): SystemMemoryInfo {
 		usagePercent: totalBytes ? Math.round((usedBytes / totalBytes) * 1000) / 10 : 0,
 		collectedAt: new Date().toISOString()
 	};
+}
+
+function readCpuTimesSnapshot(): CpuTimesSnapshot {
+	return os.cpus().reduce<CpuTimesSnapshot>((result, item) => {
+		const total = item.times.user + item.times.nice + item.times.sys + item.times.idle + item.times.irq;
+		const core = {
+			idle: item.times.idle,
+			total
+		};
+
+		return {
+			idle: result.idle + item.times.idle,
+			total: result.total + total,
+			cores: [...result.cores, core]
+		};
+	}, { idle: 0, total: 0, cores: [] });
+}
+
+function calculateCpuUsagePercent(current: CpuCoreTimesSnapshot, previous?: CpuCoreTimesSnapshot): number {
+	const totalDelta = previous ? current.total - previous.total : current.total;
+	const idleDelta = previous ? current.idle - previous.idle : current.idle;
+	const busyDelta = Math.max(totalDelta - idleDelta, 0);
+
+	return totalDelta > 0 ? roundPercent((busyDelta / totalDelta) * 100) : 0;
+}
+
+function roundPercent(value: number): number {
+	if (!Number.isFinite(value)) {
+		return 0;
+	}
+
+	return Math.min(Math.max(Math.round(value * 10) / 10, 0), 100);
 }
 
 async function readDeviceInfo(): Promise<SystemDeviceInfo> {

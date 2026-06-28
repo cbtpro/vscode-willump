@@ -1,11 +1,14 @@
 <script setup lang="ts">
-import IconCopy from '@arco-design/web-vue/es/icon/icon-copy';
 import { Message, Notification } from '@arco-design/web-vue';
 import type { Chart, ChartConfiguration } from 'chart.js';
+import type { ComponentPublicInstance } from 'vue';
 import { computed, nextTick, onActivated, onDeactivated, onMounted, onUnmounted, ref, watch } from 'vue';
 import PageHeader from '../components/common/PageHeader.vue';
+import SystemBasicTab from '../components/system-info/SystemBasicTab.vue';
+import SystemPerformanceTab from '../components/system-info/SystemPerformanceTab.vue';
+import type { CpuCoreChartItem, InfoRow, PublicIpRow } from '../components/system-info/types';
 import { t } from '../i18n';
-import { getVsCodeApi, type DeviceFormFactor, type PublicIpInfo, type SystemGpuInfo, type SystemInfo, type SystemMemoryInfo, type SystemNetworkAddress } from '../vscode';
+import { getVsCodeApi, type DeviceFormFactor, type PublicIpInfo, type SystemCpuUsageInfo, type SystemGpuInfo, type SystemInfo, type SystemMemoryInfo } from '../vscode';
 
 type SystemInfoMessage = {
 	type: 'systemInfoUpdated';
@@ -17,21 +20,17 @@ type SystemInfoMessage = {
 	success: boolean;
 	memory?: SystemMemoryInfo;
 	message?: string;
+} | {
+	type: 'systemCpuUpdated';
+	success: boolean;
+	cpu?: SystemCpuUsageInfo;
+	message?: string;
 };
 
-interface InfoRow {
-	key: string;
-	label: string;
-	value: string;
-	copyValue?: string;
-}
-
-interface PublicIpRow extends InfoRow {
-	error?: string;
-	available: boolean;
-}
-
 type MemoryChartMode = 'doughnut' | 'line' | 'smoothLine';
+type CpuChartMode = 'total' | 'cores';
+type PerformancePanelKey = 'cpu' | 'memory';
+type TemplateRefElement = Element | ComponentPublicInstance | null;
 
 interface MemorySample {
 	timestamp: number;
@@ -40,23 +39,46 @@ interface MemorySample {
 	freeBytes: number;
 }
 
+interface CpuSample {
+	timestamp: number;
+	usagePercent: number;
+	coreUsagePercentages: number[];
+}
+
+type SystemInfoTab = 'basic' | 'performance';
+
 const DEFAULT_MEMORY_REFRESH_SECONDS = 3;
 const MIN_MEMORY_REFRESH_SECONDS = 1;
 const MAX_MEMORY_REFRESH_SECONDS = 60;
 const MEMORY_REFRESH_STORAGE_KEY = 'willump.memoryRefreshSeconds';
+const MEMORY_AUTO_REFRESH_ENABLED_KEY = 'willump.memoryAutoRefreshEnabled';
+const CPU_CORE_COLORS = ['#22c55e', '#0ea5e9', '#f59e0b', '#ef4444', '#8b5cf6', '#14b8a6', '#f97316', '#ec4899'];
 
 const vscode = getVsCodeApi();
 const info = ref<SystemInfo | null>(null);
 const isLoading = ref(false);
+const systemInfoTab = ref<SystemInfoTab>('basic');
+const cpuChartCanvas = ref<HTMLCanvasElement | null>(null);
+const cpuCoreChartCanvases = ref<Array<HTMLCanvasElement | undefined>>([]);
 const memoryChartCanvas = ref<HTMLCanvasElement | null>(null);
+const cpuChartMode = ref<CpuChartMode>('total');
 const memoryChartMode = ref<MemoryChartMode>('doughnut');
 const memoryRefreshSeconds = ref(getStoredMemoryRefreshSeconds());
+const isMemoryAutoRefreshEnabled = ref(getStoredAutoRefreshEnabled());
+const cpuSamples = ref<CpuSample[]>([]);
 const memorySamples = ref<MemorySample[]>([]);
+const cpuChartOptions = computed<Array<{ label: string; value: CpuChartMode }>>(() => [
+	{ label: t('system.cpuChartTotal'), value: 'total' },
+	{ label: t('system.cpuChartCores'), value: 'cores' }
+]);
+const cpuCoreChartItems = computed(() => getCpuCoreChartItems());
 const memoryChartOptions = computed<Array<{ label: string; value: MemoryChartMode }>>(() => [
 	{ label: t('system.memoryChartDoughnut'), value: 'doughnut' },
 	{ label: t('system.memoryChartLine'), value: 'line' },
 	{ label: t('system.memoryChartSmoothLine'), value: 'smoothLine' }
 ]);
+let cpuChart: Chart | undefined;
+const cpuCoreCharts = new Map<number, Chart>();
 let memoryChart: Chart | undefined;
 let chartJsModulePromise: Promise<typeof import('chart.js/auto')> | undefined;
 let memoryRefreshTimer: ReturnType<typeof setInterval> | undefined;
@@ -106,6 +128,10 @@ const memoryStatus = computed(() => {
 	const usage = info.value?.memory.usagePercent ?? 0;
 	return usage >= 90 ? 'danger' : usage >= 75 ? 'warning' : 'normal';
 });
+const cpuStatus = computed(() => {
+	const usage = info.value?.cpu.usage.usagePercent ?? 0;
+	return usage >= 90 ? 'danger' : usage >= 75 ? 'warning' : 'normal';
+});
 const gpuRows = computed(() =>
 	(info.value?.gpus ?? []).map((item, index) => ({
 		...item,
@@ -146,6 +172,8 @@ const ipv6Rows = computed<InfoRow[]>(() => {
 		}
 	];
 });
+const cpuCollectedAtText = computed(() => info.value ? formatDateTime(info.value.cpu.usage.collectedAt) : '');
+const memoryCollectedAtText = computed(() => info.value ? formatDateTime(info.value.memory.collectedAt) : '');
 
 function refreshSystemInfo() {
 	isLoading.value = true;
@@ -158,13 +186,19 @@ function refreshSystemInfo() {
 	vscode.postMessage({ type: 'getSystemInfo' });
 }
 
-function refreshMemoryInfo() {
+function refreshPerformanceInfo() {
 	vscode?.postMessage({ type: 'getSystemMemoryInfo' });
+	vscode?.postMessage({ type: 'getSystemCpuInfo' });
 }
 
 function startMemoryRefreshTimer() {
 	stopMemoryRefreshTimer();
-	memoryRefreshTimer = setInterval(refreshMemoryInfo, memoryRefreshSeconds.value * 1000);
+
+	if (!isMemoryAutoRefreshEnabled.value) {
+		return;
+	}
+
+	memoryRefreshTimer = setInterval(refreshPerformanceInfo, memoryRefreshSeconds.value * 1000);
 }
 
 function stopMemoryRefreshTimer() {
@@ -178,7 +212,10 @@ function stopMemoryRefreshTimer() {
 
 function restartMemoryRefreshTimer() {
 	startMemoryRefreshTimer();
-	refreshMemoryInfo();
+
+	if (isMemoryAutoRefreshEnabled.value) {
+		refreshPerformanceInfo();
+	}
 }
 
 function activateSystemInfoPage() {
@@ -208,6 +245,12 @@ function handleMemoryRefreshSecondsChange(value: string | number | null | undefi
 	restartMemoryRefreshTimer();
 }
 
+function handleMemoryAutoRefreshEnabledChange(value: boolean) {
+	isMemoryAutoRefreshEnabled.value = value;
+	localStorage.setItem(MEMORY_AUTO_REFRESH_ENABLED_KEY, String(value));
+	restartMemoryRefreshTimer();
+}
+
 function handleMessage(event: MessageEvent<unknown>) {
 	const message = parseSystemInfoMessage(event.data);
 
@@ -226,6 +269,20 @@ function handleMessage(event: MessageEvent<unknown>) {
 		return;
 	}
 
+	if (message.type === 'systemCpuUpdated') {
+		if (message.success && message.cpu && info.value) {
+			recordCpuSample(message.cpu);
+			info.value = {
+				...info.value,
+				cpu: {
+					...info.value.cpu,
+					usage: message.cpu
+				}
+			};
+		}
+		return;
+	}
+
 	if (message.type !== 'systemInfoUpdated') {
 		return;
 	}
@@ -234,6 +291,7 @@ function handleMessage(event: MessageEvent<unknown>) {
 
 	if (message.success && message.info) {
 		info.value = message.info;
+		recordCpuSample(message.info.cpu.usage);
 		recordMemorySample(message.info.memory);
 		return;
 	}
@@ -252,7 +310,7 @@ function parseSystemInfoMessage(value: unknown): SystemInfoMessage | undefined {
 
 	const type = (value as { type?: unknown }).type;
 
-	if (type !== 'systemInfoUpdated' && type !== 'systemMemoryUpdated') {
+	if (type !== 'systemInfoUpdated' && type !== 'systemMemoryUpdated' && type !== 'systemCpuUpdated') {
 		return undefined;
 	}
 
@@ -356,10 +414,6 @@ function formatDateTime(value: string) {
 	return date.toLocaleString();
 }
 
-function renderIpAddress(record: SystemNetworkAddress) {
-	return record.cidr ?? record.address;
-}
-
 function loadChartJs() {
 	chartJsModulePromise ||= import('chart.js/auto');
 	return chartJsModulePromise;
@@ -373,10 +427,99 @@ function handleMemoryChartModeChange(value: string | number | boolean | Record<s
 	memoryChartMode.value = value;
 }
 
+function handleCpuChartModeChange(value: string | number | boolean | Record<string, unknown> | Array<unknown>) {
+	if (!isCpuChartMode(value)) {
+		return;
+	}
+
+	cpuChartMode.value = value;
+}
+
+function handleSystemInfoTabChange(value: string | number) {
+	if (value !== 'basic' && value !== 'performance') {
+		return;
+	}
+
+	systemInfoTab.value = value;
+
+	if (value === 'performance') {
+		void syncCpuChart();
+		void syncMemoryChart();
+	}
+}
+
+function handlePerformancePanelChange(value: PerformancePanelKey) {
+	if (value === 'cpu') {
+		void syncCpuChart();
+		return;
+	}
+
+	void syncMemoryChart();
+}
+
+async function syncCpuChart() {
+	await nextTick();
+
+	if (systemInfoTab.value !== 'performance' || !info.value) {
+		return;
+	}
+
+	if (cpuChartMode.value === 'cores') {
+		await syncCpuCoreCharts();
+		return;
+	}
+
+	destroyCpuCoreCharts();
+
+	if (!cpuChartCanvas.value) {
+		return;
+	}
+
+	if (!cpuChart) {
+		const { default: ChartConstructor } = await loadChartJs();
+
+		if (!info.value || !cpuChartCanvas.value) {
+			return;
+		}
+
+		cpuChart = new ChartConstructor(cpuChartCanvas.value, createCpuChartConfig() as ChartConfiguration);
+	}
+
+	updateCpuChart();
+}
+
+async function syncCpuCoreCharts() {
+	destroyCpuChart();
+	const { default: ChartConstructor } = await loadChartJs();
+	const activeCoreIndexes = new Set<number>();
+
+	for (let index = 0; index < getCpuCoreCount(); index += 1) {
+		const canvas = cpuCoreChartCanvases.value[index];
+
+		if (!canvas) {
+			continue;
+		}
+
+		activeCoreIndexes.add(index);
+
+		if (!cpuCoreCharts.has(index)) {
+			cpuCoreCharts.set(index, new ChartConstructor(canvas, createCpuCoreChartConfig(index) as ChartConfiguration));
+		}
+	}
+
+	for (const index of cpuCoreCharts.keys()) {
+		if (!activeCoreIndexes.has(index)) {
+			destroyCpuCoreChart(index);
+		}
+	}
+
+	updateCpuCoreCharts();
+}
+
 async function syncMemoryChart() {
 	await nextTick();
 
-	if (!info.value || !memoryChartCanvas.value) {
+	if (systemInfoTab.value !== 'performance' || !info.value || !memoryChartCanvas.value) {
 		return;
 	}
 
@@ -397,6 +540,138 @@ function createMemoryChartConfig(): ChartConfiguration {
 	return memoryChartMode.value === 'doughnut'
 		? createMemoryDoughnutConfig() as ChartConfiguration
 		: createMemoryLineConfig() as ChartConfiguration;
+}
+
+function createCpuChartConfig(): ChartConfiguration<'line', number[], string> {
+	const colors = getCpuChartColors();
+
+	return {
+		type: 'line',
+		data: {
+			labels: getCpuTrendLabels(),
+			datasets: [
+				{
+					label: t('system.cpuUsage'),
+					data: getCpuTrendData(),
+					borderColor: colors.used,
+					backgroundColor: colors.usedSoft,
+					borderWidth: 2,
+					fill: true,
+					pointRadius: 0,
+					pointHoverRadius: 4,
+					tension: 0.38
+				}
+			]
+		},
+		options: {
+			responsive: true,
+			maintainAspectRatio: false,
+			color: colors.text,
+			animation: {
+				duration: 0
+			},
+			scales: {
+				x: {
+					grid: {
+						display: false
+					},
+					ticks: {
+						color: colors.muted,
+						maxRotation: 0,
+						autoSkip: true,
+						maxTicksLimit: 4
+					}
+				},
+				y: {
+					min: 0,
+					max: 100,
+					grid: {
+						color: colors.grid
+					},
+					ticks: {
+						color: colors.muted,
+						callback: value => `${value}%`
+					}
+				}
+			},
+			plugins: {
+				legend: {
+					display: false
+				},
+				tooltip: {
+					callbacks: {
+						label: item => `${item.dataset.label}: ${Number(item.raw).toFixed(1)}%`
+					}
+				}
+			}
+		}
+	};
+}
+
+function createCpuCoreChartConfig(coreIndex: number): ChartConfiguration<'line', number[], string> {
+	const colors = getCpuChartColors();
+	const color = getCpuCoreColor(coreIndex);
+
+	return {
+		type: 'line',
+		data: {
+			labels: getCpuTrendLabels(),
+			datasets: [
+				{
+					label: t('system.cpuCoreLabel', { index: coreIndex + 1 }),
+					data: getCpuCoreTrendData(coreIndex),
+					borderColor: color,
+					backgroundColor: color,
+					borderWidth: 1.4,
+					fill: false,
+					pointRadius: getCpuCoreTrendData(coreIndex).length > 1 ? 0 : 1.8,
+					pointHoverRadius: 2,
+					tension: 0
+				}
+			]
+		},
+		options: {
+			responsive: true,
+			maintainAspectRatio: false,
+			layout: {
+				padding: 1
+			},
+			color: colors.text,
+			animation: {
+				duration: 0
+			},
+			scales: {
+				x: {
+					grid: {
+						display: false
+					},
+					ticks: {
+						display: false
+					}
+				},
+				y: {
+					min: 0,
+					max: 100,
+					grid: {
+						display: false
+					},
+					ticks: {
+						display: false
+					}
+				}
+			},
+			plugins: {
+				legend: {
+					display: false
+				},
+				tooltip: {
+					callbacks: {
+						label: item => `${item.dataset.label}: ${Number(item.raw).toFixed(1)}%`
+					}
+				}
+			}
+		}
+	};
 }
 
 function createMemoryDoughnutConfig(): ChartConfiguration<'doughnut', number[], string> {
@@ -505,6 +780,40 @@ function createMemoryLineConfig(): ChartConfiguration<'line', number[], string> 
 	};
 }
 
+function updateCpuChart() {
+	if (!cpuChart || !info.value) {
+		return;
+	}
+
+	const colors = getCpuChartColors();
+	cpuChart.options.color = colors.text;
+	const dataset = cpuChart.data.datasets[0];
+	dataset.label = t('system.cpuUsage');
+	dataset.data = getCpuTrendData();
+	dataset.borderColor = colors.used;
+	dataset.backgroundColor = colors.usedSoft;
+	cpuChart.data.labels = getCpuTrendLabels();
+	cpuChart.update('none');
+}
+
+function updateCpuCoreCharts() {
+	const colors = getCpuChartColors();
+
+	for (const [index, chart] of cpuCoreCharts) {
+		const color = getCpuCoreColor(index);
+		const dataset = chart.data.datasets[0];
+
+		chart.options.color = colors.text;
+		dataset.label = t('system.cpuCoreLabel', { index: index + 1 });
+		dataset.data = getCpuCoreTrendData(index);
+		dataset.borderColor = color;
+		dataset.backgroundColor = color;
+		dataset.pointRadius = getCpuCoreTrendData(index).length > 1 ? 0 : 1.8;
+		chart.data.labels = getCpuTrendLabels();
+		chart.update('none');
+	}
+}
+
 function updateMemoryChart() {
 	if (!memoryChart || !info.value) {
 		return;
@@ -543,6 +852,58 @@ function updateMemoryLineChart(colors: ReturnType<typeof getMemoryChartColors>) 
 	dataset.pointHoverRadius = 4;
 	dataset.tension = memoryChartMode.value === 'smoothLine' ? 0.38 : 0;
 	memoryChart.data.labels = getMemoryTrendLabels();
+}
+
+function getCpuTrendData(): number[] {
+	return getCpuSamples().map(item => item.usagePercent);
+}
+
+function getCpuCoreTrendData(coreIndex: number): number[] {
+	return getCpuSamples().map(item => item.coreUsagePercentages[coreIndex] ?? 0);
+}
+
+function getCpuTrendLabels(): string[] {
+	return getCpuSamples().map(item => formatChartTime(item.timestamp));
+}
+
+function getCpuCoreCount(): number {
+	return Math.max(
+		info.value?.cpu.cores ?? 0,
+		info.value?.cpu.usage.cores.length ?? 0,
+		...getCpuSamples().map(item => item.coreUsagePercentages.length)
+	);
+}
+
+function getCpuCoreChartItems(): CpuCoreChartItem[] {
+	const usageCores = info.value?.cpu.usage.cores ?? [];
+	const coreCount = getCpuCoreCount();
+
+	return Array.from({ length: coreCount }, (_, index) => {
+		const core = usageCores.find(item => item.index === index) ?? usageCores[index];
+
+		return {
+			index,
+			usagePercent: core?.usagePercent ?? 0,
+			idlePercent: core?.idlePercent ?? 100,
+			hasUsage: Boolean(core)
+		};
+	});
+}
+
+function getCpuCoreColor(index: number): string {
+	return CPU_CORE_COLORS[index % CPU_CORE_COLORS.length];
+}
+
+function getCpuSamples(): CpuSample[] {
+	if (cpuSamples.value.length) {
+		return cpuSamples.value;
+	}
+
+	const cpu = info.value?.cpu.usage;
+
+	return cpu
+		? [createCpuSample(cpu)]
+		: [];
 }
 
 function getMemoryChartData(): number[] {
@@ -596,8 +957,42 @@ function getMemoryChartColors() {
 	};
 }
 
+function getCpuChartColors() {
+	const usedColor = cpuStatus.value === 'danger'
+		? getCssVariable('--willump-danger')
+		: cpuStatus.value === 'warning'
+			? '#f59e0b'
+			: '#22c55e';
+
+	return {
+		used: usedColor,
+		usedSoft: `${usedColor}2e`,
+		text: getCssVariable('--willump-text'),
+		muted: getCssVariable('--willump-text-muted'),
+		grid: getCssVariable('--willump-border')
+	};
+}
+
 function getCssVariable(name: string): string {
 	return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+}
+
+function destroyCpuChart() {
+	cpuChart?.destroy();
+	cpuChart = undefined;
+}
+
+function destroyCpuCoreChart(index: number) {
+	cpuCoreCharts.get(index)?.destroy();
+	cpuCoreCharts.delete(index);
+}
+
+function destroyCpuCoreCharts() {
+	for (const chart of cpuCoreCharts.values()) {
+		chart.destroy();
+	}
+
+	cpuCoreCharts.clear();
 }
 
 function destroyMemoryChart() {
@@ -605,9 +1000,24 @@ function destroyMemoryChart() {
 	memoryChart = undefined;
 }
 
+function recordCpuSample(cpu: SystemCpuUsageInfo) {
+	const nextSamples = [...cpuSamples.value, createCpuSample(cpu)];
+	cpuSamples.value = nextSamples.slice(-24);
+}
+
 function recordMemorySample(memory: SystemMemoryInfo) {
 	const nextSamples = [...memorySamples.value, createMemorySample(memory)];
 	memorySamples.value = nextSamples.slice(-24);
+}
+
+function createCpuSample(cpu: SystemCpuUsageInfo): CpuSample {
+	const timestamp = new Date(cpu.collectedAt).getTime();
+
+	return {
+		timestamp: Number.isFinite(timestamp) ? timestamp : Date.now(),
+		usagePercent: cpu.usagePercent,
+		coreUsagePercentages: cpu.cores.map(item => item.usagePercent)
+	};
 }
 
 function createMemorySample(memory: SystemMemoryInfo): MemorySample {
@@ -623,6 +1033,16 @@ function createMemorySample(memory: SystemMemoryInfo): MemorySample {
 
 function getStoredMemoryRefreshSeconds(): number {
 	return normalizeMemoryRefreshSeconds(localStorage.getItem(MEMORY_REFRESH_STORAGE_KEY));
+}
+
+function getStoredAutoRefreshEnabled(): boolean {
+	const stored = localStorage.getItem(MEMORY_AUTO_REFRESH_ENABLED_KEY);
+
+	if (stored === null || stored === undefined) {
+		return true;
+	}
+
+	return stored === 'true';
 }
 
 function normalizeMemoryRefreshSeconds(value: unknown): number {
@@ -647,9 +1067,33 @@ function formatChartTime(timestamp: number): string {
 	});
 }
 
+function setCpuChartCanvas(el: TemplateRefElement) {
+	cpuChartCanvas.value = el instanceof HTMLCanvasElement ? el : null;
+}
+
+function setCpuCoreChartCanvas(index: number, el: TemplateRefElement) {
+	cpuCoreChartCanvases.value[index] = el instanceof HTMLCanvasElement ? el : undefined;
+}
+
+function setMemoryChartCanvas(el: TemplateRefElement) {
+	memoryChartCanvas.value = el instanceof HTMLCanvasElement ? el : null;
+}
+
 function isMemoryChartMode(value: unknown): value is MemoryChartMode {
 	return value === 'doughnut' || value === 'line' || value === 'smoothLine';
 }
+
+function isCpuChartMode(value: unknown): value is CpuChartMode {
+	return value === 'total' || value === 'cores';
+}
+
+watch(
+	() => info.value?.cpu.usage,
+	() => {
+		void syncCpuChart();
+	},
+	{ flush: 'post' }
+);
 
 watch(
 	() => info.value?.memory,
@@ -658,6 +1102,11 @@ watch(
 	},
 	{ flush: 'post' }
 );
+
+watch(cpuChartMode, () => {
+	destroyCpuChart();
+	void syncCpuChart();
+});
 
 watch(memoryChartMode, () => {
 	destroyMemoryChart();
@@ -678,6 +1127,8 @@ onDeactivated(() => {
 
 onUnmounted(() => {
 	deactivateSystemInfoPage();
+	destroyCpuChart();
+	destroyCpuCoreCharts();
 	destroyMemoryChart();
 });
 </script>
@@ -687,237 +1138,56 @@ onUnmounted(() => {
 		<PageHeader :title="t('system.title')" :subtitle="t('system.subtitle')" :action-label="t('common.refresh')" :loading="isLoading" @action="refreshSystemInfo" />
 
 		<a-spin :loading="isLoading">
-			<section v-if="info" class="system-info-grid">
-				<a-card class="config-panel" :title="t('system.basic')" :bordered="false">
-					<a-descriptions :column="1" bordered>
-						<a-descriptions-item v-for="row in basicRows" :key="row.key" :label="row.label">
-							<span class="copyable-value">
-								<span>{{ row.value }}</span>
-								<a-tooltip v-if="row.copyValue" :content="t('common.copy')">
-									<a-button type="text" size="mini" @click="copyValue(row.copyValue)">
-										<template #icon><IconCopy /></template>
-									</a-button>
-								</a-tooltip>
-							</span>
-						</a-descriptions-item>
-					</a-descriptions>
-				</a-card>
+			<a-tabs v-if="info" class="system-info-tabs" :active-key="systemInfoTab" lazy-load @change="handleSystemInfoTabChange">
+				<a-tab-pane key="basic">
+					<template #title>{{ t('system.basicInfoTab') }}</template>
 
-				<a-card class="config-panel" :title="t('system.cpu')" :bordered="false">
-					<a-descriptions :column="1" bordered>
-						<a-descriptions-item v-for="row in cpuRows" :key="row.key" :label="row.label">
-							{{ row.value }}
-						</a-descriptions-item>
-					</a-descriptions>
-				</a-card>
+					<SystemBasicTab
+						:basic-rows="basicRows"
+						:cpu-rows="cpuRows"
+						:public-ip-rows="publicIpRows"
+						:ipv6-rows="ipv6Rows"
+						:local-ip-rows="localIpRows"
+						:gpu-rows="gpuRows"
+						@copy="copyValue"
+					/>
+				</a-tab-pane>
 
-				<a-card class="config-panel" :title="t('system.memory')" :bordered="false">
-					<div class="memory-meter">
-						<a-radio-group class="memory-chart-switch" :model-value="memoryChartMode" type="button" @change="handleMemoryChartModeChange">
-							<a-radio v-for="option in memoryChartOptions" :key="option.value" :value="option.value">{{ option.label }}</a-radio>
-						</a-radio-group>
-						<div class="memory-chart-shell" :class="{ 'memory-chart-shell-line': memoryChartMode !== 'doughnut' }">
-							<canvas ref="memoryChartCanvas" class="memory-chart" :aria-label="t('system.memoryUsage')" role="img"></canvas>
-							<div v-if="memoryChartMode === 'doughnut'" class="memory-chart-value">
-								<span>{{ t('system.memoryUsage') }}</span>
-								<strong>{{ info.memory.usagePercent }}%</strong>
-							</div>
-						</div>
-						<div class="memory-refresh-line">
-							<p class="muted-line">{{ t('system.memoryAutoRefresh', { seconds: memoryRefreshSeconds }) }} / {{ t('system.collectedAt') }}: {{ formatDateTime(info.memory.collectedAt) }}</p>
-							<label class="memory-refresh-control">
-								<span>{{ t('system.memoryRefreshInterval') }}</span>
-								<a-input-number
-									class="memory-refresh-input"
-									:model-value="memoryRefreshSeconds"
-									:min="MIN_MEMORY_REFRESH_SECONDS"
-									:max="MAX_MEMORY_REFRESH_SECONDS"
-									:step="1"
-									:precision="0"
-									size="mini"
-									@change="handleMemoryRefreshSecondsChange"
-								/>
-								<span>{{ t('system.memoryRefreshUnit') }}</span>
-							</label>
-						</div>
-					</div>
-					<a-descriptions :column="1" bordered>
-						<a-descriptions-item v-for="row in memoryRows" :key="row.key" :label="row.label">
-							{{ row.value }}
-						</a-descriptions-item>
-					</a-descriptions>
-				</a-card>
+				<a-tab-pane key="performance">
+					<template #title>{{ t('system.performanceTab') }}</template>
 
-				<a-card class="config-panel" :title="t('system.publicIp')" :bordered="false">
-					<a-descriptions :column="1" bordered>
-						<a-descriptions-item v-for="row in publicIpRows" :key="row.key" :label="row.label">
-							<span class="copyable-value">
-								<span>
-									{{ row.value }}
-									<small v-if="!row.available && row.error" class="muted-inline">{{ row.error }}</small>
-								</span>
-								<a-tooltip v-if="row.copyValue" :content="t('common.copy')">
-									<a-button type="text" size="mini" @click="copyValue(row.copyValue)">
-										<template #icon><IconCopy /></template>
-									</a-button>
-								</a-tooltip>
-							</span>
-						</a-descriptions-item>
-						<a-descriptions-item v-for="row in ipv6Rows" :key="row.key" :label="row.label">
-							<a-tag :color="row.value === t('common.yes') ? 'green' : 'gray'">{{ row.value }}</a-tag>
-						</a-descriptions-item>
-					</a-descriptions>
-				</a-card>
-			</section>
-
-			<a-card v-if="info" class="config-panel" :title="t('system.network')" :bordered="false">
-				<a-table :data="localIpRows" :pagination="false" :bordered="{ cell: true }" row-key="id">
-					<template #columns>
-						<a-table-column :title="t('system.interfaceName')" data-index="interfaceName" :width="180" />
-						<a-table-column :title="t('system.family')" data-index="family" :width="100" />
-						<a-table-column :title="t('system.address')">
-							<template #cell="{ record }">
-								<span class="copyable-value">
-									<span>{{ renderIpAddress(record) }}</span>
-									<a-tooltip :content="t('common.copy')">
-										<a-button type="text" size="mini" @click="copyValue(record.address)">
-											<template #icon><IconCopy /></template>
-										</a-button>
-									</a-tooltip>
-								</span>
-							</template>
-						</a-table-column>
-					</template>
-					<template #empty>
-						<a-empty :description="t('system.emptyAddress')" />
-					</template>
-				</a-table>
-			</a-card>
-
-			<a-card v-if="info" class="config-panel" :title="t('system.gpu')" :bordered="false">
-				<a-table :data="gpuRows" :pagination="false" :bordered="{ cell: true }" row-key="id">
-					<template #columns>
-						<a-table-column :title="t('system.gpuName')" data-index="name" />
-						<a-table-column :title="t('system.gpuVendor')" data-index="vendor" :width="180" />
-						<a-table-column :title="t('system.gpuMemory')" data-index="memoryText" :width="140" />
-						<a-table-column :title="t('system.gpuDriver')" data-index="driverVersion" :width="180" />
-					</template>
-					<template #empty>
-						<a-empty :description="t('system.noGpuData')" />
-					</template>
-				</a-table>
-			</a-card>
+					<SystemPerformanceTab
+						:memory-refresh-seconds="memoryRefreshSeconds"
+						:min-memory-refresh-seconds="MIN_MEMORY_REFRESH_SECONDS"
+						:max-memory-refresh-seconds="MAX_MEMORY_REFRESH_SECONDS"
+						:is-auto-refresh-enabled="isMemoryAutoRefreshEnabled"
+						:cpu-chart-mode="cpuChartMode"
+						:cpu-chart-options="cpuChartOptions"
+						:cpu-usage-percent="info.cpu.usage.usagePercent"
+						:cpu-collected-at-text="cpuCollectedAtText"
+						:cpu-core-items="cpuCoreChartItems"
+						:memory-chart-mode="memoryChartMode"
+						:memory-chart-options="memoryChartOptions"
+						:memory-usage-percent="info.memory.usagePercent"
+						:memory-collected-at-text="memoryCollectedAtText"
+						:memory-rows="memoryRows"
+						:set-cpu-chart-canvas="setCpuChartCanvas"
+						:set-cpu-core-chart-canvas="setCpuCoreChartCanvas"
+						:set-memory-chart-canvas="setMemoryChartCanvas"
+						@memory-refresh-seconds-change="handleMemoryRefreshSecondsChange"
+						@auto-refresh-enabled-change="handleMemoryAutoRefreshEnabledChange"
+						@cpu-chart-mode-change="handleCpuChartModeChange"
+						@memory-chart-mode-change="handleMemoryChartModeChange"
+						@panel-change="handlePerformancePanelChange"
+					/>
+				</a-tab-pane>
+			</a-tabs>
 		</a-spin>
 	</main>
 </template>
 
 <style scoped>
-.system-info-grid {
-	display: grid;
-	grid-template-columns: repeat(2, minmax(0, 1fr));
-	gap: 16px;
-	margin-bottom: 16px;
-}
-
-.copyable-value {
-	display: inline-flex;
-	align-items: center;
-	gap: 6px;
-	max-width: 100%;
-	word-break: break-all;
-}
-
-.memory-meter {
-	display: grid;
-	justify-items: center;
-	gap: 12px;
-}
-
-.memory-chart-switch {
-	justify-self: stretch;
-	display: flex;
-	flex-wrap: wrap;
-	gap: 6px;
-}
-
-.memory-chart-shell {
-	position: relative;
-	width: min(180px, 100%);
-	aspect-ratio: 1;
-}
-
-.memory-chart-shell-line {
-	width: 100%;
-	height: 220px;
-	aspect-ratio: auto;
-}
-
-.memory-chart {
-	display: block;
-	width: 100%;
-	height: 100%;
-}
-
-.memory-chart-value {
-	position: absolute;
-	inset: 0;
-	display: grid;
-	align-items: center;
-	justify-items: center;
-	align-content: center;
-	gap: 4px;
-	padding: 32px;
-	text-align: center;
-	pointer-events: none;
-}
-
-.memory-chart-value span {
-	color: var(--willump-text-muted);
-	font-size: 12px;
-	line-height: 1.2;
-}
-
-.memory-chart-value strong {
-	color: var(--willump-text);
-	font-size: 28px;
-	line-height: 1;
-}
-
-.memory-refresh-line {
-	display: flex;
-	align-items: center;
-	justify-content: space-between;
-	gap: 10px;
-	width: 100%;
-}
-
-.memory-refresh-control {
-	display: inline-flex;
-	align-items: center;
-	flex: 0 0 auto;
-	gap: 6px;
-	color: var(--willump-text-muted);
-	font-size: 12px;
-}
-
-.memory-refresh-input {
-	width: 86px;
-}
-
-.muted-inline {
-	display: block;
-	margin-top: 4px;
-	color: var(--willump-text-muted);
-}
-
-@media (max-width: 760px) {
-	.system-info-grid {
-		grid-template-columns: 1fr;
-	}
-
-	.memory-refresh-line {
-		align-items: flex-start;
-		flex-direction: column;
-	}
+.system-info-tabs {
+	min-width: 0;
 }
 </style>

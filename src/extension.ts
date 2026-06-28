@@ -9,7 +9,7 @@ import {
 	killProcessByPid
 } from './utils/common.port';
 import { getGitConfigInfo, updateGitConfig, updateGitSetting } from './utils/git.config';
-import { getSystemInfo, getSystemMemoryInfo } from './utils/system.info';
+import { getSystemCpuUsageInfo, getSystemInfo, getSystemMemoryInfo } from './utils/system.info';
 import { Commands } from './constants';
 import { localize } from './i18n';
 
@@ -269,6 +269,11 @@ async function handleWebviewMessage(
 
 	if (message?.type === 'getSystemMemoryInfo') {
 		target.webview.postMessage({ type: 'systemMemoryUpdated', success: true, memory: getSystemMemoryInfo() });
+		return;
+	}
+
+	if (message?.type === 'getSystemCpuInfo') {
+		target.webview.postMessage({ type: 'systemCpuUpdated', success: true, cpu: getSystemCpuUsageInfo() });
 		return;
 	}
 

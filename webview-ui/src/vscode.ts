@@ -120,6 +120,19 @@ export interface SystemMemoryInfo {
 	collectedAt: string;
 }
 
+export interface SystemCpuUsageInfo {
+	usagePercent: number;
+	idlePercent: number;
+	cores: SystemCpuCoreUsageInfo[];
+	collectedAt: string;
+}
+
+export interface SystemCpuCoreUsageInfo {
+	index: number;
+	usagePercent: number;
+	idlePercent: number;
+}
+
 export interface SystemInfo {
 	hostname: string;
 	platform: string;
@@ -132,6 +145,7 @@ export interface SystemInfo {
 		cores: number;
 		speedMHz: number;
 		architecture: string;
+		usage: SystemCpuUsageInfo;
 	};
 	memory: SystemMemoryInfo;
 	gpus: SystemGpuInfo[];

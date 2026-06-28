@@ -1,7 +1,4 @@
 <script setup lang="ts">
-import IconSort from '@arco-design/web-vue/es/icon/icon-sort';
-import IconSortAscending from '@arco-design/web-vue/es/icon/icon-sort-ascending';
-import IconSortDescending from '@arco-design/web-vue/es/icon/icon-sort-descending';
 import { computed, toRef } from 'vue';
 import useTableSort from '../../composables/useTableSort';
 import ColumnSettingsDropdown from './ColumnSettingsDropdown.vue';
@@ -48,7 +45,9 @@ function getKillPort(record: PortTableRow) {
 </script>
 
 <template>
-	<a-table :data="rows" :loading="loading" :pagination="false" :bordered="{ cell: true }" :scroll="{ x: 1240 }" row-key="rowId">
+	<div class="ports-table-wrapper">
+		<a-table :data="rows" :loading="loading" :pagination="false" :bordered="{ cell: true }" :scroll="{ y: 'calc(100vh - 280px)', minWidth: 700 }" row-key="rowId"
+			class="ports-table">
 		<template #columns>
 			<a-table-column v-for="column in columns" :key="column.key" :data-index="column.key" :width="column.width">
 				<template #title>
@@ -58,32 +57,29 @@ function getKillPort(record: PortTableRow) {
 					</button>
 				</template>
 			</a-table-column>
-			<a-table-column :width="120" align="right">
+			<a-table-column :width="160" align="right" fixed="right">
 				<template #title>
 					<div class="table-action-header">
 						<span>{{ t('ports.action') }}</span>
-						<ColumnSettingsDropdown :all-columns="allColumns" :current-columns="columns" @toggle-column="(key, checked) => emit('toggle-column', key, checked)" />
+						<ColumnSettingsDropdown :all-columns="allColumns" :current-columns="columns"
+							@toggle-column="(key, checked) => emit('toggle-column', key, checked)" />
 					</div>
 				</template>
 				<template #cell="{ record }">
 					<a-space>
-						<a-button v-if="record.commandFull" type="text" size="small" @click="emit('view-command', record.commandFull)">
+						<a-button v-if="record.commandFull" type="text" size="small"
+							@click="emit('view-command', record.commandFull)">
 							{{ t('ports.view') }}
 						</a-button>
-						<a-popconfirm
-							v-if="!isKillDisabled(record)"
-							type="warning"
-							position="left"
-							:ok-text="t('ports.confirmKill')"
-							:cancel-text="t('common.cancel')"
-							:ok-button-props="killOkButtonProps"
-							@ok="emit('kill', record)"
-						>
+						<a-popconfirm v-if="!isKillDisabled(record)" type="warning" position="left"
+							:ok-text="t('ports.confirmKill')" :cancel-text="t('common.cancel')"
+							:ok-button-props="killOkButtonProps" @ok="emit('kill', record)">
 							<template #content>
 								<div class="kill-confirm-content">
 									<strong>{{ t('ports.confirmKillTitle') }}</strong>
 									<p>{{ t('ports.confirmKillDescription') }}</p>
-									<p>{{ t('ports.port') }}: {{ getKillPort(record) }} / {{ t('ports.pid') }}: {{ record.pid }}</p>
+									<p>{{ t('ports.port') }}: {{ getKillPort(record) }} / {{ t('ports.pid') }}: {{
+										record.pid }}</p>
 								</div>
 							</template>
 							<a-button type="text" status="danger" size="small">
@@ -101,9 +97,23 @@ function getKillPort(record: PortTableRow) {
 			<a-empty :description="emptyDescription" />
 		</template>
 	</a-table>
+	</div>
 </template>
 
 <style scoped>
+.ports-table-wrapper {
+	width: 100%;
+	overflow: hidden;
+}
+
+.ports-table {
+	min-width: 700px;
+}
+
+.ports-table :deep(.arco-table-container) {
+	overflow-x: auto;
+}
+
 .table-action-header a-button {
 	margin-left: 4px;
 }
