@@ -27,7 +27,8 @@
       "willump": [
         {
           "id": "willump.featuresView",
-          "name": "%view.features.name%"
+          "name": "%view.features.name%",
+          "icon": "assets/activity-bar.svg"
         }
       ]
     },

@@ -8,6 +8,7 @@ import type { GpuDisplayRow, InfoRow, LocalIpRow, PublicIpRow } from './types';
 defineProps<{
 	basicRows: InfoRow[];
 	cpuRows: InfoRow[];
+	memoryRows: InfoRow[];
 	publicIpRows: PublicIpRow[];
 	ipv6Rows: InfoRow[];
 	localIpRows: LocalIpRow[];
@@ -28,6 +29,8 @@ function renderIpAddress(record: LocalIpRow) {
 		<InfoDescriptionCard :title="t('system.basic')" :rows="basicRows" copyable @copy="$emit('copy', $event)" />
 
 		<InfoDescriptionCard :title="t('system.cpu')" :rows="cpuRows" />
+
+		<InfoDescriptionCard :title="t('system.memory')" :rows="memoryRows" />
 
 		<a-card class="config-panel" :title="t('system.publicIp')" :bordered="false">
 			<a-descriptions :column="1" bordered>

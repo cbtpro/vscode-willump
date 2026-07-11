@@ -20,16 +20,4 @@ export interface GpuDisplayRow {
 	driverVersion?: string | null;
 }
 
-export interface CpuCoreChartItem {
-	index: number;
-	usagePercent: number;
-	idlePercent: number;
-	hasUsage: boolean;
-}
-
-export interface SelectOption<T extends string> {
-	label: string;
-	value: T;
-}
-
 export type LocalIpRow = SystemNetworkAddress;

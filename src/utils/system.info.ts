@@ -4,6 +4,27 @@ import * as https from 'https';
 import * as os from 'os';
 import { promisify } from 'util';
 
+export interface SystemCpuUsageInfo {
+	usagePercent: number;
+	idlePercent: number;
+	cores: SystemCpuCoreUsageInfo[];
+	collectedAt: string;
+}
+
+export interface SystemCpuCoreUsageInfo {
+	index: number;
+	usagePercent: number;
+	idlePercent: number;
+}
+
+export interface SystemMemoryInfo {
+	totalBytes: number;
+	freeBytes: number;
+	usedBytes: number;
+	usagePercent: number;
+	collectedAt: string;
+}
+
 const execFileAsync = promisify(childProcess.execFile);
 const PUBLIC_IP_TIMEOUT_MS = 4500;
 
@@ -28,19 +49,6 @@ export interface SystemCpuInfo {
 	speedMHz: number;
 	architecture: SystemArchitecture;
 	usage: SystemCpuUsageInfo;
-}
-
-export interface SystemCpuUsageInfo {
-	usagePercent: number;
-	idlePercent: number;
-	cores: SystemCpuCoreUsageInfo[];
-	collectedAt: string;
-}
-
-export interface SystemCpuCoreUsageInfo {
-	index: number;
-	usagePercent: number;
-	idlePercent: number;
 }
 
 export interface SystemGpuInfo {
@@ -68,14 +76,6 @@ export interface PublicIpInfo {
 	address: string;
 	available: boolean;
 	error?: string;
-}
-
-export interface SystemMemoryInfo {
-	totalBytes: number;
-	freeBytes: number;
-	usedBytes: number;
-	usagePercent: number;
-	collectedAt: string;
 }
 
 export interface SystemNetworkInfo {
@@ -172,24 +172,46 @@ interface MacGpuInfoPayload {
 	SPDisplaysDataType?: JsonListInput<MacDisplayPayload>;
 }
 
-interface CpuTimesSnapshot {
-	idle: number;
-	total: number;
-	cores: CpuCoreTimesSnapshot[];
+let cachedGpuInfo: SystemGpuInfo[] | undefined;
+let cachedDeviceInfo: SystemDeviceInfo | undefined;
+let cachedPublicIpv4: PublicIpInfo | undefined;
+let cachedPublicIpv6: PublicIpInfo | undefined;
+
+function buildMemoryInfo(): SystemMemoryInfo {
+	const totalBytes = os.totalmem();
+	const freeBytes = os.freemem();
+	const usedBytes = Math.max(totalBytes - freeBytes, 0);
+
+	return {
+		totalBytes,
+		freeBytes,
+		usedBytes,
+		usagePercent: totalBytes ? Math.round((usedBytes / totalBytes) * 1000) / 10 : 0,
+		collectedAt: new Date().toISOString()
+	};
 }
 
-interface CpuCoreTimesSnapshot {
-	idle: number;
-	total: number;
-}
+function buildCpuUsageInfo(): SystemCpuUsageInfo {
+	const cpuList = os.cpus();
+	const cores = cpuList.map((cpu, index) => ({
+		index,
+		usagePercent: 0,
+		idlePercent: 100
+	}));
 
-let previousCpuTimesSnapshot: CpuTimesSnapshot | undefined;
+	return {
+		usagePercent: 0,
+		idlePercent: 100,
+		cores,
+		collectedAt: new Date().toISOString()
+	};
+}
 
 export async function getSystemInfo(): Promise<SystemInfo> {
 	const cpuList = os.cpus();
 	const firstCpu = cpuList[0];
-	const cpuUsage = getSystemCpuUsageInfo();
-	const memory = getSystemMemoryInfo();
+	const cpuUsage = buildCpuUsageInfo();
+	const memory = buildMemoryInfo();
 	const network = readNetworkAddresses();
 
 	const [device, gpus, publicIpv4, publicIpv6] = await Promise.all([
@@ -227,86 +249,23 @@ export async function getSystemInfo(): Promise<SystemInfo> {
 	};
 }
 
-export function getSystemCpuUsageInfo(): SystemCpuUsageInfo {
-	const current = readCpuTimesSnapshot();
-	const previous = previousCpuTimesSnapshot;
-	previousCpuTimesSnapshot = current;
-
-	const usagePercent = calculateCpuUsagePercent(current, previous);
-	const cores = current.cores.map((item, index) => {
-		const coreUsagePercent = calculateCpuUsagePercent(item, previous?.cores[index]);
-
-		return {
-			index,
-			usagePercent: coreUsagePercent,
-			idlePercent: roundPercent(100 - coreUsagePercent)
-		};
-	});
-
-	return {
-		usagePercent,
-		idlePercent: roundPercent(100 - usagePercent),
-		cores,
-		collectedAt: new Date().toISOString()
-	};
-}
-
-export function getSystemMemoryInfo(): SystemMemoryInfo {
-	const totalBytes = os.totalmem();
-	const freeBytes = os.freemem();
-	const usedBytes = Math.max(totalBytes - freeBytes, 0);
-
-	return {
-		totalBytes,
-		freeBytes,
-		usedBytes,
-		usagePercent: totalBytes ? Math.round((usedBytes / totalBytes) * 1000) / 10 : 0,
-		collectedAt: new Date().toISOString()
-	};
-}
-
-function readCpuTimesSnapshot(): CpuTimesSnapshot {
-	return os.cpus().reduce<CpuTimesSnapshot>((result, item) => {
-		const total = item.times.user + item.times.nice + item.times.sys + item.times.idle + item.times.irq;
-		const core = {
-			idle: item.times.idle,
-			total
-		};
-
-		return {
-			idle: result.idle + item.times.idle,
-			total: result.total + total,
-			cores: [...result.cores, core]
-		};
-	}, { idle: 0, total: 0, cores: [] });
-}
-
-function calculateCpuUsagePercent(current: CpuCoreTimesSnapshot, previous?: CpuCoreTimesSnapshot): number {
-	const totalDelta = previous ? current.total - previous.total : current.total;
-	const idleDelta = previous ? current.idle - previous.idle : current.idle;
-	const busyDelta = Math.max(totalDelta - idleDelta, 0);
-
-	return totalDelta > 0 ? roundPercent((busyDelta / totalDelta) * 100) : 0;
-}
-
-function roundPercent(value: number): number {
-	if (!Number.isFinite(value)) {
-		return 0;
-	}
-
-	return Math.min(Math.max(Math.round(value * 10) / 10, 0), 100);
-}
-
 async function readDeviceInfo(): Promise<SystemDeviceInfo> {
+	if (cachedDeviceInfo) {
+		return cachedDeviceInfo;
+	}
+
+	let result: SystemDeviceInfo;
+
 	if (process.platform === 'win32') {
-		return readWindowsDeviceInfo();
+		result = await readWindowsDeviceInfo();
+	} else if (process.platform === 'darwin') {
+		result = await readMacDeviceInfo();
+	} else {
+		result = await readLinuxDeviceInfo();
 	}
 
-	if (process.platform === 'darwin') {
-		return readMacDeviceInfo();
-	}
-
-	return readLinuxDeviceInfo();
+	cachedDeviceInfo = result;
+	return result;
 }
 
 async function readWindowsDeviceInfo(): Promise<SystemDeviceInfo> {
@@ -478,23 +437,26 @@ function readNetworkAddresses(): Pick<SystemNetworkInfo, 'localIpv4' | 'localIpv
 }
 
 async function readGpuInfo(): Promise<SystemGpuInfo[]> {
+	if (cachedGpuInfo) {
+		return cachedGpuInfo;
+	}
+
+	let result: SystemGpuInfo[];
+
 	if (process.platform === 'win32') {
-		return readWindowsGpuInfo();
+		result = await readWindowsGpuInfo();
+	} else if (process.platform === 'darwin') {
+		result = await readMacGpuInfo();
+	} else if (process.platform === 'linux') {
+		result = await readLinuxGpuInfo();
+	} else if (['freebsd', 'openbsd'].includes(process.platform)) {
+		result = await readBsdGpuInfo();
+	} else {
+		result = [];
 	}
 
-	if (process.platform === 'darwin') {
-		return readMacGpuInfo();
-	}
-
-	if (process.platform === 'linux') {
-		return readLinuxGpuInfo();
-	}
-
-	if (['freebsd', 'openbsd'].includes(process.platform)) {
-		return readBsdGpuInfo();
-	}
-
-	return [];
+	cachedGpuInfo = result;
+	return result;
 }
 
 async function readWindowsGpuInfo(): Promise<SystemGpuInfo[]> {
@@ -680,6 +642,43 @@ function normalizeGpuName(value: string): string {
 		.trim();
 }
 
+function parseVramStringToBytes(vramStr?: string): number | undefined {
+	if (!vramStr) {
+		return undefined;
+	}
+
+	const match = vramStr.match(/^([\d.]+)\s*(GB|MB|KB|TB|B)\s*$/i);
+	if (!match) {
+		return undefined;
+	}
+
+	const value = Number(match[1]);
+	const unit = match[2].toUpperCase();
+	const multipliers: Record<string, number> = {
+		B: 1,
+		KB: 1024,
+		MB: 1024 * 1024,
+		GB: 1024 * 1024 * 1024,
+		TB: 1024 * 1024 * 1024 * 1024
+	};
+
+	const result = value * (multipliers[unit] ?? 0);
+	return result > 0 ? result : undefined;
+}
+
+function formatBytesReadable(bytes: number): string {
+	const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+	let value = bytes;
+	let unitIndex = 0;
+
+	while (value >= 1024 && unitIndex < units.length - 1) {
+		value /= 1024;
+		unitIndex += 1;
+	}
+
+	return `${value.toFixed(unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`;
+}
+
 async function readMacGpuInfo(): Promise<SystemGpuInfo[]> {
 	try {
 		const { stdout } = await execFileAsync('system_profiler', ['SPDisplaysDataType', '-json'], {
@@ -688,17 +687,69 @@ async function readMacGpuInfo(): Promise<SystemGpuInfo[]> {
 		});
 		const parsed = parseJson<MacGpuInfoPayload>(stdout);
 
-		return parseJsonList<MacDisplayPayload>(parsed.SPDisplaysDataType)
-			.map(item => ({
-				name: toOptionalString(item.sppci_model) ?? toOptionalString(item._name) ?? '',
-				type: inferGpuType(toOptionalString(item.sppci_model) ?? toOptionalString(item._name) ?? '', toOptionalString(item.spdisplays_vendor) ?? ''),
-				memory: toOptionalString(item.spdisplays_vram) ?? toOptionalString(item.spdisplays_vram_shared),
-				vendor: toOptionalString(item.spdisplays_vendor)
-			}))
+		const displays = parseJsonList<MacDisplayPayload>(parsed.SPDisplaysDataType);
+		const isAppleSilicon = os.arch() === 'arm64';
+		const totalMemoryBytes = await getMacTotalMemoryBytes();
+
+		return displays
+			.map(item => {
+				const name = toOptionalString(item.sppci_model) ?? toOptionalString(item._name) ?? '';
+				const rawVendor = toOptionalString(item.spdisplays_vendor);
+				const vendor = normalizeMacVendorName(rawVendor);
+				const vramText = toOptionalString(item.spdisplays_vram) ?? toOptionalString(item.spdisplays_vram_shared);
+				const vramBytes = parseVramStringToBytes(vramText);
+
+				let memoryBytes: number | undefined;
+				let memory: string | undefined;
+
+				if (vramBytes && vramBytes > 0) {
+					memoryBytes = vramBytes;
+					memory = vramText;
+				} else if (isAppleSilicon && totalMemoryBytes > 0) {
+					memoryBytes = totalMemoryBytes;
+					memory = formatBytesReadable(totalMemoryBytes) + ' (Unified)';
+				}
+
+				return {
+					name,
+					type: inferGpuType(name, vendor),
+					memoryBytes,
+					memory,
+					vendor
+				};
+			})
 			.filter(hasGpuName);
 	} catch (err) {
 		return [];
 	}
+}
+
+async function getMacTotalMemoryBytes(): Promise<number> {
+	try {
+		const { stdout } = await execFileAsync('sysctl', ['-n', 'hw.memsize'], {
+			encoding: 'utf8',
+			timeout: 3000
+		});
+		const value = Number(stdout.trim());
+		return Number.isFinite(value) && value > 0 ? value : os.totalmem();
+	} catch {
+		return os.totalmem();
+	}
+}
+
+function normalizeMacVendorName(vendor?: string): string {
+	if (!vendor) {
+		return '';
+	}
+
+	const mappings: Record<string, string> = {
+		'sppci_vendor_Apple': 'Apple',
+		'sppci_vendor_Intel': 'Intel',
+		'sppci_vendor_NVIDIA': 'NVIDIA',
+		'sppci_vendor_AMD': 'AMD'
+	};
+
+	return mappings[vendor] ?? vendor;
 }
 
 async function readLinuxGpuInfo(): Promise<SystemGpuInfo[]> {
@@ -907,16 +958,114 @@ function hasGpuName(item: SystemGpuInfo | undefined): item is SystemGpuInfo {
 	return Boolean(item?.name);
 }
 
-async function readPublicIp(version: 4 | 6): Promise<PublicIpInfo> {
-	const options =
-		version === 4
-			? { hostname: 'api.ipify.org', path: '/?format=text', family: 4 }
-			: { hostname: 'api6.ipify.org', path: '/?format=text', family: 6 };
+function isValidIpAddress(address: string, version: 4 | 6): boolean {
+	if (!address) {
+		return false;
+	}
 
-	return new Promise(resolve => {
+	if (version === 4) {
+		const ipv4Pattern = /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
+		return ipv4Pattern.test(address);
+	}
+
+	const ipv6Pattern = /^(?:[0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}$|^::$|^::1$|^(?:[0-9a-fA-F]{1,4}:){1,7}:$|^(?:[0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}$/;
+	return ipv6Pattern.test(address) || isCompressedIpv6(address);
+}
+
+function isCompressedIpv6(address: string): boolean {
+	if (!address.includes('::')) {
+		return false;
+	}
+
+	const groups = address.split('::');
+	if (groups.length !== 2) {
+		return false;
+	}
+
+	const leftGroups = groups[0] ? groups[0].split(':').length : 0;
+	const rightGroups = groups[1] ? groups[1].split(':').length : 0;
+
+	if (leftGroups + rightGroups > 7) {
+		return false;
+	}
+
+	const allGroups = [...groups[0]?.split(':') ?? [], ...groups[1]?.split(':') ?? []];
+	return allGroups.every(group => /^[0-9a-fA-F]{0,4}$/.test(group));
+}
+
+async function readPublicIp(version: 4 | 6): Promise<PublicIpInfo> {
+	if (version === 4 && cachedPublicIpv4) {
+		return cachedPublicIpv4;
+	}
+
+	if (version === 6 && cachedPublicIpv6) {
+		return cachedPublicIpv6;
+	}
+
+	const services = getPublicIpServices(version);
+	let lastError: string | undefined;
+
+	for (const service of services) {
+		try {
+			const result = await fetchPublicIpFromService(service, version);
+			if (result.available) {
+				if (version === 4) {
+					cachedPublicIpv4 = result;
+				} else {
+					cachedPublicIpv6 = result;
+				}
+				return result;
+			}
+			lastError = result.error;
+		} catch (err) {
+			lastError = err instanceof Error ? err.message : String(err);
+		}
+	}
+
+	const fallbackResult: PublicIpInfo = {
+		address: '',
+		available: false,
+		error: lastError
+	};
+
+	if (version === 4) {
+		cachedPublicIpv4 = fallbackResult;
+	} else {
+		cachedPublicIpv6 = fallbackResult;
+	}
+
+	return fallbackResult;
+}
+
+interface PublicIpService {
+	hostname: string;
+	path: string;
+}
+
+function getPublicIpServices(version: 4 | 6): PublicIpService[] {
+	if (version === 4) {
+		return [
+			{ hostname: 'api.ipify.org', path: '/?format=text' },
+			{ hostname: 'ipv4.icanhazip.com', path: '/' },
+			{ hostname: 'ifconfig.me', path: '/ip' },
+			{ hostname: 'ipv4bot.whatismyipaddress.com', path: '/' }
+		];
+	}
+
+	return [
+		{ hostname: 'api6.ipify.org', path: '/?format=text' },
+		{ hostname: 'ipv6.icanhazip.com', path: '/' },
+		{ hostname: 'ipv6bot.whatismyipaddress.com', path: '/' }
+	];
+}
+
+function fetchPublicIpFromService(service: PublicIpService, version: 4 | 6): Promise<PublicIpInfo> {
+	return new Promise((resolve, reject) => {
 		const request = https.get(
 			{
-				...options,
+				hostname: service.hostname,
+				path: service.path,
+				family: version,
 				timeout: PUBLIC_IP_TIMEOUT_MS,
 				headers: {
 					'User-Agent': 'Willump VS Code Extension'
@@ -939,6 +1088,24 @@ async function readPublicIp(version: 4 | 6): Promise<PublicIpInfo> {
 					}
 
 					const address = body.trim();
+					if (!address && response.statusCode === 200) {
+						resolve({
+							address: '',
+							available: false,
+							error: 'Empty response'
+						});
+						return;
+					}
+
+					if (!isValidIpAddress(address, version)) {
+						resolve({
+							address: '',
+							available: false,
+							error: `Invalid IPv${version} address`
+						});
+						return;
+					}
+
 					resolve({
 						address,
 						available: Boolean(address)
@@ -948,14 +1115,10 @@ async function readPublicIp(version: 4 | 6): Promise<PublicIpInfo> {
 		);
 
 		request.on('timeout', () => {
-			request.destroy(new Error('Public IP request timed out'));
+			request.destroy(new Error('Request timed out'));
 		});
 		request.on('error', err => {
-			resolve({
-				address: '',
-				available: false,
-				error: err.message
-			});
+			reject(err);
 		});
 	});
 }
