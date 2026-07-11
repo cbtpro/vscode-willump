@@ -95,6 +95,7 @@
     "@vscode/test-electron": "^2.5.2",
     "@vscode/vsce": "^3.9.1",
     "@vue/test-utils": "^2.3.0",
+    "esbuild": "^0.28.0",
     "eslint": "^9.25.1",
     "jsdom": "^21.1.0",
     "typescript": "^5.8.3",

@@ -1,4 +1,4 @@
-﻿# Willump
+# Willump
 
 [![CI](https://github.com/cbtpro/vscode-willump/actions/workflows/ci.yml/badge.svg)](https://github.com/cbtpro/vscode-willump/actions/workflows/ci.yml) [![Powered by ChatGPT](https://img.shields.io/badge/Powered%20by-ChatGPT-10B981?logo=openai&logoColor=white)](https://chat.openai.com/) [![Powered by GitHub Copilot](https://img.shields.io/badge/Powered%20by-GitHub%20Copilot-2ea44f?logo=github&logoColor=white)](https://github.com/features/copilot)
 
@@ -142,6 +142,20 @@ Webview 使用说明
 
 - 提交新特性前建议先在 Issue 讨论。
 - 所有 PR 请保证通过 CI（单元与集成测试）。
+
+## Changelog
+
+### v0.0.6
+
+- 删除性能监控相关代码（CPU/内存图表、自动刷新等），简化系统信息页面
+- 修复 GitHub Actions 中 `npm ci` 同步失败问题（添加 `esbuild@^0.28.0` 满足 vite@8 peer dependency）
+- 在 package.json 的 view 配置中添加 icon 属性
+
+### v0.0.5
+
+- 修复 macOS GPU 显存显示问题（Apple Silicon 统一内存架构）
+- 修复 macOS IPv6 公网 IP 获取失败问题（添加多服务 fallback）
+- 支持跨平台系统信息获取（Windows、macOS Intel、macOS M 系列、Linux）
 
 致谢
 
