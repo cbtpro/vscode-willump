@@ -1153,6 +1153,7 @@ onUnmounted(() => {
 					/>
 				</a-tab-pane>
 
+<!--
 				<a-tab-pane key="performance">
 					<template #title>{{ t('system.performanceTab') }}</template>
 
@@ -1181,6 +1182,7 @@ onUnmounted(() => {
 						@panel-change="handlePerformancePanelChange"
 					/>
 				</a-tab-pane>
+-->
 			</a-tabs>
 		</a-spin>
 	</main>
