@@ -70,6 +70,27 @@ npm run watch:webview
 
 修改后在 Extension Development Host 中执行 `Developer: Reload Window` 以应用更改。
 
+## 编译
+
+```bash
+npm run compile
+```
+
+## 打包
+
+```bash
+npm run package
+```
+
+## 打tag
+
+```bash
+git tag v0.0.6
+git push --tags
+```
+
+
+
 ## 调试要点
 
 - 在 `src/extension.ts` 或 `src/utils/common.port.ts` 中设置断点来调试扩展侧逻辑。
